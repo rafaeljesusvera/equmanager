@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="theme-color" content="#1c1917" />
-<title>Ecumanager</title>
+<title>Equmanager</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -21,12 +21,11 @@ html, body, #root { height: 100%; margin: 0; font-family: -apple-system, BlinkMa
 <div id="root">
   <div id="boot-message" style="padding:20px;font-family:-apple-system,sans-serif;color:#666;text-align:center;padding-top:40vh;">
     <div style="font-size:48px;margin-bottom:12px;">🏇</div>
-    <div style="font-weight:900;margin-bottom:8px;">Cargando Ecumanager…</div>
+    <div style="font-weight:900;margin-bottom:8px;">Cargando Equmanager…</div>
     <div id="boot-status" style="font-size:11px;color:#999;font-family:monospace;">Esperando librerías</div>
   </div>
 </div>
 <script>
-  // Detector de fallos de carga: si en 8 segundos React no ha montado, mostrar diagnóstico
   window._bootStart = Date.now();
   window._bootCheck = setInterval(function() {
     var s = document.getElementById('boot-status');
@@ -44,7 +43,6 @@ html, body, #root { height: 100%; margin: 0; font-family: -apple-system, BlinkMa
       s.style.color = '#c00';
     }
   }, 200);
-  // Error global handler antes de React
   window.addEventListener('error', function(e) {
     var s = document.getElementById('boot-status');
     if (s) {
@@ -61,8 +59,6 @@ const SUPABASE_URL = 'https://mbpmoipqcaaudwtzjydn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UJsJcTAfaU-Vuo3NTNzbRg_mceqVPu0';
 const SUPABASE_BUCKET = 'ecumanager';
 
-// Cliente lazy: lo creamos cuando se use por primera vez,
-// no al cargar el script (window.supabase puede no estar listo aún).
 let _supabase = null;
 function getSupabase() {
   if (_supabase) return _supabase;
@@ -79,17 +75,19 @@ async function uploadDataUrl(path, dataUrl) {
   const { error } = await getSupabase().storage.from(SUPABASE_BUCKET).upload(path, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
   if (error) throw error;
   const { data } = getSupabase().storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+  // Cache-buster: como upsert reemplaza el blob pero la URL pública es la misma,
+  // añadimos un timestamp para forzar a los clientes a descargar la versión nueva.
   return data.publicUrl + '?t=' + Date.now();
 }
 
 async function cloudLoad(clubCode) {
   const { data, error } = await getSupabase()
     .from('club_data')
-    .select('data')
+    .select('data, updated_at')
     .eq('club_code', clubCode)
     .maybeSingle();
   if (error) throw error;
-  return data ? data.data : null;
+  return data ? { data: data.data, updatedAt: data.updated_at } : null;
 }
 
 async function cloudSave(clubCode, payload) {
@@ -129,14 +127,17 @@ const RefreshCw = (p) => <Icon {...p} d={<><polyline points="23 4 23 10 17 10"/>
 const LogOut = (p) => <Icon {...p} d={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>} />;
 const Cloud = (p) => <Icon {...p} d={<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>} />;
 
-function Ecumanager() {
+function Equmanager() {
   // === Sincronización en la nube ===
   const [clubCode, setClubCode] = useState(() => {
-    try { return localStorage.getItem('ecumanager_club_code') || ''; } catch (e) { return ''; }
+    try { return localStorage.getItem('equmanager_club_code') || ''; } catch (e) { return ''; }
   });
-  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'loading' | 'syncing' | 'error' | 'ok'
+  const [syncStatus, setSyncStatus] = useState('idle');
   const [syncMessage, setSyncMessage] = useState('');
   const initialLoadDone = useRef(false);
+  const lastSavedUpdatedAt = useRef(null);
+  // Refs vivos para que el polling lea siempre el estado actual sin cerrar capturas
+  const stateRef = useRef({});
 
   const [screen, setScreen] = useState('home');
   const [selectedHorse, setSelectedHorse] = useState(null);
@@ -158,16 +159,36 @@ function Ecumanager() {
   const [clubClassFilter, setClubClassFilter] = useState('proximas');
 
   const [customImages, setCustomImages] = useState({});
-
   const [badgeImages, setBadgeImages] = useState({});
 
-  // Tipo de sesión: 'club' (admin) o 'rider' (jinete) o null (no logado)
   const [userType, setUserType] = useState(() => {
-    try { return localStorage.getItem('ecumanager_user_type') || ''; } catch (e) { return ''; }
+    try { return localStorage.getItem('equmanager_user_type') || ''; } catch (e) { return ''; }
   });
   const [riderName, setRiderName] = useState(() => {
-    try { return localStorage.getItem('ecumanager_rider_name') || ''; } catch (e) { return ''; }
+    try { return localStorage.getItem('equmanager_rider_name') || ''; } catch (e) { return ''; }
   });
+
+  // === FIX: subida de foto + guardado inmediato en club_data ===
+  // En lugar de confiar solo en el debounce de 700ms, hacemos cloudSave inmediato
+  // con el nuevo estado para garantizar que otros dispositivos lo vean al refrescar.
+  const saveImmediateAfterUpload = async (overrides) => {
+    if (!clubCode) return;
+    try {
+      const snap = stateRef.current;
+      const payload = {
+        clubHorses: snap.clubHorses,
+        clubRiders: snap.clubRiders,
+        clubConfig: snap.clubConfig,
+        customImages: snap.customImages,
+        badgeImages: snap.badgeImages,
+        clubClasses: snap.clubClasses,
+        ...overrides,
+      };
+      await cloudSave(clubCode, payload);
+    } catch (err) {
+      console.error('Guardado inmediato falló:', err);
+    }
+  };
 
   const handleImageUpload = (horseName, event) => {
     const file = event.target.files[0];
@@ -182,7 +203,10 @@ function Ecumanager() {
         const safeName = horseName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_');
         const path = `${clubCode}/horses/${safeName}.${ext}`;
         const publicUrl = await uploadDataUrl(path, e.target.result);
-        setCustomImages(prev => ({ ...prev, [horseName]: publicUrl }));
+        const nextCustom = { ...(stateRef.current.customImages || {}), [horseName]: publicUrl };
+        setCustomImages(nextCustom);
+        // Guardado inmediato para que el jinete (u otro móvil) lo vea al refrescar
+        await saveImmediateAfterUpload({ customImages: nextCustom });
         setSyncStatus('ok'); setSyncMessage('Foto sincronizada');
         setTimeout(() => setSyncStatus('idle'), 1500);
       } catch (err) {
@@ -206,7 +230,9 @@ function Ecumanager() {
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
         const path = `${clubCode}/badges/${badgeId}.${ext}`;
         const publicUrl = await uploadDataUrl(path, e.target.result);
-        setBadgeImages(prev => ({ ...prev, [badgeId]: publicUrl }));
+        const nextBadges = { ...(stateRef.current.badgeImages || {}), [badgeId]: publicUrl };
+        setBadgeImages(nextBadges);
+        await saveImmediateAfterUpload({ badgeImages: nextBadges });
         setSyncStatus('ok'); setSyncMessage('Foto sincronizada');
         setTimeout(() => setSyncStatus('idle'), 1500);
       } catch (err) {
@@ -219,11 +245,10 @@ function Ecumanager() {
   };
 
   const resetBadgeImage = (badgeId) => {
-    setBadgeImages(prev => {
-      const next = { ...prev };
-      delete next[badgeId];
-      return next;
-    });
+    const next = { ...(stateRef.current.badgeImages || {}) };
+    delete next[badgeId];
+    setBadgeImages(next);
+    saveImmediateAfterUpload({ badgeImages: next });
   };
 
   const HorseImg = ({ name }) => {
@@ -262,7 +287,6 @@ function Ecumanager() {
     { id: 3, horse: 'Trueno', date: '20 May', time: '19:00', duration: '1h 30min', feeling: 'Intensa', feelingColor: '#f59e0b', intensity: 5, note: 'Primer salto de 1m. ¡Lo logramos!', hasPhoto: true, milestone: true },
   ];
 
-  // === MIEMBROS DEL CLUB (jinetes) — fuente única persistida ===
   const defaultClubRiders = [
     { id: 'r1', name: 'Carlota Van der Berg', level: 'U14 · Medio', category: 'U14', tier: 'Medio', email: 'carlota@example.com', phone: '', joinDate: 'Ene 2024', role: 'alumno', status: 'activo', notes: '' },
     { id: 'r2', name: 'Diego Ramos', level: 'U16 · Alto', category: 'U16', tier: 'Alto', email: '', phone: '', joinDate: 'Sep 2022', role: 'alumno', status: 'activo', notes: '' },
@@ -276,9 +300,7 @@ function Ecumanager() {
 
   const [clubRiders, setClubRiders] = useState([]);
 
-  const saveClubRiders = (next) => {
-    setClubRiders(next);
-  };
+  const saveClubRiders = (next) => { setClubRiders(next); };
 
   const upsertClubRider = (rider) => {
     const level = `${rider.category} · ${rider.tier}`;
@@ -291,13 +313,8 @@ function Ecumanager() {
     }
   };
 
-  const archiveClubRider = (id) => {
-    saveClubRiders(clubRiders.map(r => r.id === id ? { ...r, status: 'baja' } : r));
-  };
-
-  const restoreClubRider = (id) => {
-    saveClubRiders(clubRiders.map(r => r.id === id ? { ...r, status: 'activo' } : r));
-  };
+  const archiveClubRider = (id) => { saveClubRiders(clubRiders.map(r => r.id === id ? { ...r, status: 'baja' } : r)); };
+  const restoreClubRider = (id) => { saveClubRiders(clubRiders.map(r => r.id === id ? { ...r, status: 'activo' } : r)); };
 
   const deleteClubRider = (id) => {
     const linked = clubHorses.filter(h => h.ownerId === id || (h.riderIds || []).includes(id));
@@ -314,7 +331,6 @@ function Ecumanager() {
     saveClubRiders(clubRiders.filter(r => r.id !== id));
   };
 
-  // === CONFIGURACIÓN DEL CLUB (branding) ===
   const defaultClubConfig = {
     name: 'Club Hípica La Finca',
     shortName: 'La Finca',
@@ -326,10 +342,7 @@ function Ecumanager() {
   };
 
   const [clubConfig, setClubConfig] = useState(defaultClubConfig);
-
-  const saveClubConfig = (next) => {
-    setClubConfig(next);
-  };
+  const saveClubConfig = (next) => { setClubConfig(next); };
 
   const handleLogoUpload = (event) => {
     const file = event.target.files[0];
@@ -343,7 +356,9 @@ function Ecumanager() {
         const ext = (file.name.split('.').pop() || 'png').toLowerCase();
         const path = `${clubCode}/logo.${ext}`;
         const publicUrl = await uploadDataUrl(path, e.target.result);
-        saveClubConfig({ ...clubConfig, logo: publicUrl });
+        const nextConfig = { ...stateRef.current.clubConfig, logo: publicUrl };
+        saveClubConfig(nextConfig);
+        await saveImmediateAfterUpload({ clubConfig: nextConfig });
         setSyncStatus('ok'); setSyncMessage('Logo sincronizado');
         setTimeout(() => setSyncStatus('idle'), 1500);
       } catch (err) {
@@ -355,7 +370,6 @@ function Ecumanager() {
     reader.readAsDataURL(file);
   };
 
-  // === CABALLOS DEL CLUB — fuente única, persistido en localStorage ===
   const defaultClubHorses = [
     { id: 'h1', name: 'Tornado', color: '#8B5A3C', kind: 'mixto', ownerId: 'r4', riderIds: ['r1','r2','r8'], status: 'activo', discipline: 'Salto', breed: 'PRE × Hannoveriano', height: '1.68m', age: 7, coat: 'Castaño', since: '2018', notes: '' },
     { id: 'h2', name: 'Luna', color: '#C9A876', kind: 'escuela', ownerId: null, riderIds: ['r1','r2','r3','r5','r6','r8'], status: 'activo', discipline: 'Doma', breed: 'KWPN', height: '1.65m', age: 9, coat: 'Palomino', since: '2016', notes: '' },
@@ -366,10 +380,7 @@ function Ecumanager() {
   ];
 
   const [clubHorses, setClubHorses] = useState([]);
-
-  const saveClubHorses = (next) => {
-    setClubHorses(next);
-  };
+  const saveClubHorses = (next) => { setClubHorses(next); };
 
   const upsertClubHorse = (horse) => {
     if (horse.id && clubHorses.some(h => h.id === horse.id)) {
@@ -380,21 +391,13 @@ function Ecumanager() {
     }
   };
 
-  const archiveClubHorse = (id) => {
-    saveClubHorses(clubHorses.map(h => h.id === id ? { ...h, status: 'baja' } : h));
-  };
-
-  const restoreClubHorse = (id) => {
-    saveClubHorses(clubHorses.map(h => h.id === id ? { ...h, status: 'activo' } : h));
-  };
-
+  const archiveClubHorse = (id) => { saveClubHorses(clubHorses.map(h => h.id === id ? { ...h, status: 'baja' } : h)); };
+  const restoreClubHorse = (id) => { saveClubHorses(clubHorses.map(h => h.id === id ? { ...h, status: 'activo' } : h)); };
   const deleteClubHorse = (id) => {
     if (!confirm('¿Eliminar definitivamente este caballo del club? Esto NO se puede deshacer.')) return;
     saveClubHorses(clubHorses.filter(h => h.id !== id));
   };
 
-  // === CLASES DEL CLUB ===
-  // Helpers de fecha
   const fmtDate = (d) => {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -408,7 +411,6 @@ function Ecumanager() {
   };
   const todayStr = fmtDate(new Date());
 
-  // Genera datos demo a partir de la fecha actual
   const _today = new Date();
   const defaultClubClasses = [
     { id: 'c1', date: fmtDate(addDays(_today, 1)),  time: '18:00', duration: 60, coachId: null, riderId: 'r1', horseId: 'h1', discipline: 'Salto', objectives: ['Trabajar líneas de 4 trancos', 'Mantener ritmo en curvas'], status: 'programada', feedback: '', feedbackRating: 0 },
@@ -419,9 +421,7 @@ function Ecumanager() {
   ];
 
   const [clubClasses, setClubClasses] = useState([]);
-
   const saveClubClasses = (next) => setClubClasses(next);
-
   const upsertClubClass = (klass) => {
     if (klass.id && clubClasses.some(c => c.id === klass.id)) {
       saveClubClasses(clubClasses.map(c => c.id === klass.id ? klass : c));
@@ -430,13 +430,11 @@ function Ecumanager() {
       saveClubClasses([...clubClasses, newClass]);
     }
   };
-
   const deleteClubClass = (id) => {
     if (!confirm('¿Eliminar esta clase? Esto no se puede deshacer.')) return;
     saveClubClasses(clubClasses.filter(c => c.id !== id));
   };
 
-  // Helpers de datos
   const horseById = (id) => clubHorses.find(h => h.id === id);
   const riderById = (id) => clubRiders.find(r => r.id === id);
   const formatHumanDate = (dateStr) => {
@@ -456,38 +454,58 @@ function Ecumanager() {
   };
 
   // === SINCRONIZACIÓN: descarga al cambiar clubCode ===
-  const loadFromCloud = async (code) => {
+  const loadFromCloud = async (code, opts = {}) => {
     if (!code) return;
-    setSyncStatus('loading'); setSyncMessage('Cargando datos del club…');
+    const silent = opts.silent === true;
+    if (!silent) { setSyncStatus('loading'); setSyncMessage('Cargando datos del club…'); }
     try {
-      const data = await cloudLoad(code);
-      if (data) {
-        // Cargar datos existentes
+      const result = await cloudLoad(code);
+      if (result && result.data) {
+        const data = result.data;
+        // Si es un refresh silencioso y el updated_at no ha cambiado, no apliques nada
+        if (silent && lastSavedUpdatedAt.current && result.updatedAt === lastSavedUpdatedAt.current) {
+          return;
+        }
+        lastSavedUpdatedAt.current = result.updatedAt;
         setClubHorses(data.clubHorses || []);
         setClubRiders(data.clubRiders || []);
         setClubConfig({ ...defaultClubConfig, ...(data.clubConfig || {}) });
         setCustomImages(data.customImages || {});
         setBadgeImages(data.badgeImages || {});
         setClubClasses(data.clubClasses || []);
-        setSyncMessage('Sincronizado');
+        if (!silent) setSyncMessage('Sincronizado');
       } else {
-        // Club nuevo: sembrar con datos por defecto
-        setClubHorses(defaultClubHorses);
-        setClubRiders(defaultClubRiders);
-        setClubConfig(defaultClubConfig);
-        setCustomImages({});
-        setBadgeImages({});
-        setClubClasses(defaultClubClasses);
-        setSyncMessage('Club nuevo creado');
+        // Club nuevo: sembrar con datos por defecto SOLO si entras como club (admin)
+        // Si entras como jinete a un club que no existe, no sembramos para no corromper datos.
+        if (userType === 'club') {
+          setClubHorses(defaultClubHorses);
+          setClubRiders(defaultClubRiders);
+          setClubConfig(defaultClubConfig);
+          setCustomImages({});
+          setBadgeImages({});
+          setClubClasses(defaultClubClasses);
+          if (!silent) setSyncMessage('Club nuevo creado');
+        } else {
+          setClubHorses([]);
+          setClubRiders([]);
+          setClubConfig(defaultClubConfig);
+          setCustomImages({});
+          setBadgeImages({});
+          setClubClasses([]);
+          if (!silent) setSyncMessage('Club aún sin datos');
+        }
       }
-      setSyncStatus('ok');
-      setTimeout(() => setSyncStatus('idle'), 1500);
-      // Marcar la carga inicial como completa DESPUÉS de aplicar los datos
+      if (!silent) {
+        setSyncStatus('ok');
+        setTimeout(() => setSyncStatus('idle'), 1500);
+      }
       setTimeout(() => { initialLoadDone.current = true; }, 100);
     } catch (err) {
       console.error(err);
-      setSyncStatus('error');
-      setSyncMessage('Error al cargar: ' + err.message);
+      if (!silent) {
+        setSyncStatus('error');
+        setSyncMessage('Error al cargar: ' + err.message);
+      }
     }
   };
 
@@ -499,6 +517,11 @@ function Ecumanager() {
     }
   }, [clubCode]);
 
+  // Mantener stateRef siempre actualizado para los handlers async
+  useEffect(() => {
+    stateRef.current = { clubHorses, clubRiders, clubConfig, customImages, badgeImages, clubClasses };
+  }, [clubHorses, clubRiders, clubConfig, customImages, badgeImages, clubClasses]);
+
   // Sube con debounce cuando cambia algo de los datos persistentes
   useEffect(() => {
     if (!clubCode || !initialLoadDone.current) return;
@@ -508,6 +531,9 @@ function Ecumanager() {
         await cloudSave(clubCode, {
           clubHorses, clubRiders, clubConfig, customImages, badgeImages, clubClasses
         });
+        // Como acabamos de guardar, actualizamos el lastSavedUpdatedAt para que
+        // el poll silencioso no se sobrescriba a sí mismo.
+        lastSavedUpdatedAt.current = new Date().toISOString();
         setSyncStatus('ok'); setSyncMessage('Sincronizado');
         setTimeout(() => setSyncStatus('idle'), 1200);
       } catch (err) {
@@ -518,11 +544,37 @@ function Ecumanager() {
     return () => clearTimeout(handle);
   }, [clubHorses, clubRiders, clubConfig, customImages, badgeImages, clubClasses, clubCode]);
 
+  // === FIX: auto-refresh para que otros dispositivos vean cambios ===
+  // - Cada 15s mientras la app está activa, refrescamos silenciosamente
+  // - Cuando la pestaña recupera el foco (visibilitychange), refrescamos también
+  useEffect(() => {
+    if (!clubCode) return;
+    let intervalId = null;
+    const tick = () => {
+      if (document.visibilityState === 'visible' && initialLoadDone.current) {
+        loadFromCloud(clubCode, { silent: true });
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && initialLoadDone.current) {
+        loadFromCloud(clubCode, { silent: true });
+      }
+    };
+    intervalId = setInterval(tick, 15000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [clubCode]);
+
   // Guarda el código de club en localStorage como preferencia local
   useEffect(() => {
     try {
-      if (clubCode) localStorage.setItem('ecumanager_club_code', clubCode);
-      else localStorage.removeItem('ecumanager_club_code');
+      if (clubCode) localStorage.setItem('equmanager_club_code', clubCode);
+      else localStorage.removeItem('equmanager_club_code');
     } catch (e) {}
   }, [clubCode]);
 
@@ -535,20 +587,18 @@ function Ecumanager() {
     }
   }, [userType]);
 
-  // Función pública para forzar refresh (botón en UI)
   const refreshFromCloud = () => {
     if (!clubCode) return;
-    initialLoadDone.current = false;
     loadFromCloud(clubCode);
   };
 
-  // Cerrar sesión del club: limpia estado y vuelve a la pantalla de entrada
   const exitClub = () => {
     if (!confirm('¿Cambiar de sesión? Tus datos seguirán guardados en la nube.')) return;
     initialLoadDone.current = false;
+    lastSavedUpdatedAt.current = null;
     try {
-      localStorage.removeItem('ecumanager_user_type');
-      localStorage.removeItem('ecumanager_rider_name');
+      localStorage.removeItem('equmanager_user_type');
+      localStorage.removeItem('equmanager_rider_name');
     } catch (e) {}
     setUserType('');
     setRiderName('');
@@ -562,7 +612,6 @@ function Ecumanager() {
     setScreen('home');
   };
 
-  // === Derivado: lista que ve el jinete en "Caballos del club" (sin bajas, con campos de UI) ===
   const horsesForRider = clubHorses
     .filter(h => h.status !== 'baja')
     .map(h => ({
@@ -608,10 +657,9 @@ function Ecumanager() {
     { category: 'Veterinario', amount: 85, color: '#EF4444', icon: '🏥' },
   ];
   const totalExpenses = expenses.reduce((a, b) => a + b.amount, 0);
-  // Encuentra al rider actual (el del modo jinete) buscando por nombre
+
   const currentRider = riderName ? clubRiders.find(r => r.name.toLowerCase() === riderName.toLowerCase()) : null;
 
-  // Próxima clase del jinete actual (futuras + programadas)
   const _futureClasses = clubClasses
     .filter(c => c.status === 'programada' && (c.date > todayStr || (c.date === todayStr && c.time >= new Date().toTimeString().slice(0, 5))))
     .filter(c => currentRider ? c.riderId === currentRider.id : false)
@@ -638,7 +686,6 @@ function Ecumanager() {
     };
   })() : null;
 
-  // Última valoración recibida por el jinete actual
   const _lastDoneClass = clubClasses
     .filter(c => c.status === 'realizada' && c.feedback && c.feedback.trim())
     .filter(c => currentRider ? c.riderId === currentRider.id : false)
@@ -664,7 +711,6 @@ function Ecumanager() {
     { name: 'Aprendizaje', color: '#06b6d4', emoji: '🎯' },
   ];
 
-  // ====== Helpers de etiquetas para gestor club ======
   const KIND_LABELS = {
     escuela: { label: 'Escuela', color: 'bg-blue-100 text-blue-700', icon: '🎓' },
     propietario: { label: 'Propietario', color: 'bg-purple-100 text-purple-700', icon: '👤' },
@@ -1040,7 +1086,7 @@ function Ecumanager() {
         <div className="h-64 relative overflow-hidden">
           <HorseImg name={h.name} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30"></div>
-          <div className="absolute top-3 right-3"><PhotoButton horseName={h.name} /></div>
+          {userType === 'club' && <div className="absolute top-3 right-3"><PhotoButton horseName={h.name} /></div>}
           <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
             <div className="text-4xl font-black drop-shadow-lg">{h.name}</div>
             <div className="text-sm font-bold opacity-90">{h.breed} · {h.height}</div>
@@ -1077,7 +1123,7 @@ function Ecumanager() {
         <div className="h-56 relative overflow-hidden">
           <HorseImg name="Káiser" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
-          <div className="absolute top-3 left-3"><PhotoButton horseName="Káiser" /></div>
+          {userType === 'club' && <div className="absolute top-3 left-3"><PhotoButton horseName="Káiser" /></div>}
           <div className="absolute top-3 right-3 bg-yellow-300 px-2 py-1 rounded-md"><div className="text-[10px] font-black text-stone-900 uppercase tracking-widest">⭐ Tu caballo</div></div>
           <div className="absolute bottom-4 left-5 right-5 text-white">
             <div className="text-4xl font-black drop-shadow-lg">{h.name}</div>
@@ -1303,9 +1349,6 @@ function Ecumanager() {
     </>
   );
 
-  // =====================================================================
-  // GESTOR DE CABALLOS DEL CLUB
-  // =====================================================================
   const ClubHorsesScreen = () => {
     const filters = [
       { id: 'todos', label: 'Todos' },
@@ -1326,7 +1369,6 @@ function Ecumanager() {
           </button>
         } />
         <div className="px-5 pt-3">
-          {/* Resumen */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             {[
               { label: 'Escuela', count: clubHorses.filter(h => h.kind === 'escuela' && h.status !== 'baja').length, color: 'from-blue-400 to-blue-600' },
@@ -1340,20 +1382,17 @@ function Ecumanager() {
             ))}
           </div>
 
-          {/* Filtros tipo */}
           <div className="flex gap-2 mb-4 overflow-x-auto -mx-5 px-5 pb-1">
             {filters.map(f => (
               <button key={f.id} onClick={() => setClubHorseFilter(f.id)} className={`px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-wider whitespace-nowrap ${clubHorseFilter === f.id ? 'bg-stone-900 text-yellow-300' : 'bg-stone-100 text-stone-600'}`}>{f.label}</button>
             ))}
           </div>
 
-          {/* Toggle archivados */}
           <button onClick={() => setShowArchived(!showArchived)} className={`w-full mb-4 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 ${showArchived ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>
             <Archive size={14} />
             {showArchived ? `Ocultar bajas (${clubHorses.filter(h => h.status === 'baja').length})` : `Ver bajas (${clubHorses.filter(h => h.status === 'baja').length})`}
           </button>
 
-          {/* Lista de caballos */}
           {visibleHorses.length === 0 ? (
             <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-2xl p-8 text-center">
               <div className="text-4xl mb-2 opacity-50">🐎</div>
@@ -1397,9 +1436,6 @@ function Ecumanager() {
     );
   };
 
-  // =====================================================================
-  // EDICIÓN / ALTA DE CABALLO DEL CLUB
-  // =====================================================================
   const ClubHorseEditScreen = () => {
     const isNew = editingHorseId === 'new';
     const existing = isNew ? null : clubHorses.find(h => h.id === editingHorseId);
@@ -1418,7 +1454,6 @@ function Ecumanager() {
 
     const handleSave = () => {
       if (!form.name.trim()) { alert('El nombre es obligatorio.'); return; }
-      // Limpiar campos según tipo
       let cleaned = { ...form };
       if (cleaned.kind === 'escuela') cleaned.ownerId = null;
       if (cleaned.kind === 'propietario') cleaned.riderIds = [];
@@ -1438,7 +1473,6 @@ function Ecumanager() {
           </button>
         } />
         <div className="px-5 pt-4 pb-8">
-          {/* Foto */}
           <div className="bg-stone-100 rounded-2xl overflow-hidden mb-5 relative h-48">
             {form.name ? <HorseImg name={form.name} /> : (
               <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-stone-200 to-stone-300">
@@ -1451,14 +1485,12 @@ function Ecumanager() {
             )}
           </div>
 
-          {/* Nombre */}
           <label className="block mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Nombre *</div>
             <input type="text" value={form.name} onChange={(e) => update('name', e.target.value)} placeholder="Ej. Tornado"
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm font-bold focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Tipo */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Tipo *</div>
             <div className="grid grid-cols-3 gap-2">
@@ -1477,7 +1509,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Propietario */}
           {showOwner && (
             <div className="mb-4">
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Propietario *</div>
@@ -1489,7 +1520,6 @@ function Ecumanager() {
             </div>
           )}
 
-          {/* Jinetes autorizados */}
           {showRiders && (
             <div className="mb-4">
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">
@@ -1514,7 +1544,6 @@ function Ecumanager() {
             </div>
           )}
 
-          {/* Disciplina */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Disciplina</div>
             <div className="flex gap-2 flex-wrap">
@@ -1525,7 +1554,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Datos físicos */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <label className="block">
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Edad</div>
@@ -1555,7 +1583,6 @@ function Ecumanager() {
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm font-bold focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Estado */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Estado</div>
             <div className="grid grid-cols-3 gap-2">
@@ -1571,7 +1598,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Notas */}
           <label className="block mb-5">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Notas veterinarias / observaciones</div>
             <textarea value={form.notes} onChange={(e) => update('notes', e.target.value)} rows={3}
@@ -1579,7 +1605,6 @@ function Ecumanager() {
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm resize-none focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Acciones peligrosas */}
           {!isNew && (
             <div className="border-t-2 border-stone-100 pt-5 space-y-2">
               {existing?.status !== 'baja' ? (
@@ -1607,9 +1632,6 @@ function Ecumanager() {
     );
   };
 
-  // =====================================================================
-  // CLUB · INICIO (dashboard del club)
-  // =====================================================================
   const ClubHomeScreen = () => {
     const activeHorses = clubHorses.filter(h => h.status === 'activo');
     const rehabHorses = clubHorses.filter(h => h.status === 'rehabilitacion');
@@ -1636,7 +1658,6 @@ function Ecumanager() {
           </div>
         } />
         <div className="px-5 pt-3 pb-5">
-          {/* Hero */}
           <div className="rounded-3xl p-5 mb-5 text-white" style={{ background: clubConfig.primaryColor }}>
             <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: clubConfig.accentColor }}>Panel del club</div>
             <div className="text-2xl font-black mt-1 leading-tight">Buenas, equipo</div>
@@ -1657,7 +1678,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Alertas / cosas pendientes */}
           {(rehabHorses.length > 0 || offHorses.length > 0 || photoBadges < unlockedBadges.length || horsesWithPhoto < activeHorses.length) && (
             <>
               <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Atención</h2>
@@ -1706,7 +1726,6 @@ function Ecumanager() {
             </>
           )}
 
-          {/* Accesos directos */}
           <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Accesos directos</h2>
           <div className="grid grid-cols-2 gap-3 mb-5">
             <button onClick={() => { setEditingHorseId('new'); setScreen('clubhorseedit'); }} className="bg-stone-900 text-white rounded-2xl p-4 text-left">
@@ -1731,7 +1750,6 @@ function Ecumanager() {
             </button>
           </div>
 
-          {/* Próximas clases */}
           {(() => {
             const upcoming = clubClasses
               .filter(c => c.status === 'programada' && c.date >= todayStr)
@@ -1767,7 +1785,6 @@ function Ecumanager() {
             );
           })()}
 
-          {/* Composición de jinetes */}
           <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Composición del club</h2>
           <div className="bg-white border border-stone-200 rounded-2xl p-4 mb-5">
             <div className="space-y-3">
@@ -1795,7 +1812,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Composición de caballos */}
           <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Tipos de caballo</h2>
           <div className="grid grid-cols-3 gap-2">
             {[
@@ -1815,9 +1831,6 @@ function Ecumanager() {
     );
   };
 
-  // =====================================================================
-  // CLUB · CLASES (gestor completo)
-  // =====================================================================
   const ClubClassesScreen = () => {
     const filters = [
       { id: 'proximas', label: 'Próximas' },
@@ -1845,7 +1858,6 @@ function Ecumanager() {
       visible.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
     }
 
-    // Agrupar por fecha
     const grouped = {};
     visible.forEach(c => {
       if (!grouped[c.date]) grouped[c.date] = [];
@@ -1868,7 +1880,6 @@ function Ecumanager() {
           </button>
         } />
         <div className="px-5 pt-3">
-          {/* Resumen */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             {[
               { label: 'Próximas', count: clubClasses.filter(c => c.date >= today && c.status === 'programada').length, color: 'from-blue-400 to-blue-600' },
@@ -1882,14 +1893,12 @@ function Ecumanager() {
             ))}
           </div>
 
-          {/* Filtros */}
           <div className="flex gap-2 mb-4 overflow-x-auto -mx-5 px-5 pb-1">
             {filters.map(f => (
               <button key={f.id} onClick={() => setClubClassFilter(f.id)} className={`px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-wider whitespace-nowrap ${clubClassFilter === f.id ? 'bg-stone-900 text-yellow-300' : 'bg-stone-100 text-stone-600'}`}>{f.label}</button>
             ))}
           </div>
 
-          {/* Lista */}
           {orderedDates.length === 0 ? (
             <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-2xl p-8 text-center">
               <div className="text-4xl mb-2 opacity-50">📅</div>
@@ -1949,17 +1958,9 @@ function Ecumanager() {
     const isNew = editingClassId === 'new';
     const existing = isNew ? null : clubClasses.find(c => c.id === editingClassId);
     const [form, setForm] = useState(existing || {
-      date: todayStr,
-      time: '18:00',
-      duration: 60,
-      coachId: null,
-      riderId: '',
-      horseId: '',
-      discipline: 'Salto',
-      objectives: [],
-      status: 'programada',
-      feedback: '',
-      feedbackRating: 0,
+      date: todayStr, time: '18:00', duration: 60, coachId: null, riderId: '',
+      horseId: '', discipline: 'Salto', objectives: [], status: 'programada',
+      feedback: '', feedbackRating: 0,
     });
     const [newObjective, setNewObjective] = useState('');
 
@@ -2001,7 +2002,6 @@ function Ecumanager() {
           </button>
         } />
         <div className="px-5 pt-4 pb-8">
-          {/* Fecha y hora */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <label className="block">
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Fecha *</div>
@@ -2025,7 +2025,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Jinete */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Jinete *</div>
             <select value={form.riderId} onChange={(e) => update('riderId', e.target.value)}
@@ -2035,7 +2034,6 @@ function Ecumanager() {
             </select>
           </div>
 
-          {/* Caballo */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Caballo *</div>
             <select value={form.horseId} onChange={(e) => update('horseId', e.target.value)}
@@ -2045,7 +2043,6 @@ function Ecumanager() {
             </select>
           </div>
 
-          {/* Profesor (opcional) */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Profesor</div>
             <select value={form.coachId || ''} onChange={(e) => update('coachId', e.target.value || null)}
@@ -2053,10 +2050,9 @@ function Ecumanager() {
               <option value="">— Sin asignar —</option>
               {teachers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
-            {teachers.length === 0 && <div className="text-[10px] text-stone-500 mt-1">No hay profesores. Añade jinetes con rol "Profesor" en el gestor de jinetes.</div>}
+            {teachers.length === 0 && <div className="text-[10px] text-stone-500 mt-1">No hay profesores. Añade jinetes con rol "Profesor" en el gestor.</div>}
           </div>
 
-          {/* Disciplina */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Disciplina</div>
             <div className="flex gap-2 flex-wrap">
@@ -2067,7 +2063,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Objetivos */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Objetivos de la clase</div>
             <div className="space-y-1.5 mb-2">
@@ -2086,13 +2081,10 @@ function Ecumanager() {
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addObjective(); } }}
                 placeholder="Añadir objetivo…"
                 className="flex-1 border-2 border-stone-200 rounded-xl p-2.5 text-sm focus:border-yellow-400 outline-none" />
-              <button onClick={addObjective} className="bg-stone-900 text-white px-4 rounded-xl text-xs font-black uppercase tracking-widest">
-                Añadir
-              </button>
+              <button onClick={addObjective} className="bg-stone-900 text-white px-4 rounded-xl text-xs font-black uppercase tracking-widest">Añadir</button>
             </div>
           </div>
 
-          {/* Estado */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Estado</div>
             <div className="grid grid-cols-3 gap-2">
@@ -2110,14 +2102,13 @@ function Ecumanager() {
             )}
           </div>
 
-          {/* Valoración (solo si realizada) */}
           {form.status === 'realizada' && (
             <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4">
               <div className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-2">📝 Valoración del profesor</div>
               <textarea value={form.feedback} onChange={(e) => update('feedback', e.target.value)} rows={4}
                 placeholder="Cómo fue la clase, progreso del jinete, qué trabajar la próxima vez…"
                 className="w-full border-2 border-green-200 rounded-xl p-3 text-sm resize-none focus:border-green-400 outline-none bg-white mb-3" />
-              <div className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1.5">Puntuación de la sesión</div>
+              <div className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1.5">Puntuación</div>
               <div className="flex gap-1">
                 {[1,2,3,4,5].map(n => (
                   <button key={n} onClick={() => update('feedbackRating', n)} className="text-2xl">
@@ -2128,7 +2119,6 @@ function Ecumanager() {
             </div>
           )}
 
-          {/* Acciones */}
           {!isNew && (
             <div className="border-t-2 border-stone-100 pt-5">
               <button onClick={() => { deleteClubClass(existing.id); setScreen('clubclasses'); }}
@@ -2143,7 +2133,7 @@ function Ecumanager() {
   };
 
   // =====================================================================
-  // CLUB · MÁS (menú con accesos secundarios)
+  // CLUB · MÁS
   // =====================================================================
   const ClubMoreScreen = () => (
     <>
@@ -2228,6 +2218,7 @@ function Ecumanager() {
     </div>
   );
 
+
   // =====================================================================
   // GESTOR DE JINETES DEL CLUB
   // =====================================================================
@@ -2247,14 +2238,13 @@ function Ecumanager() {
 
     return (
       <>
-        <Header title="Gestor de jinetes" back={() => setScreen('profile')} action={
+        <Header title="Gestor de jinetes" back={() => setScreen('clubhome')} action={
           <button onClick={() => { setEditingRiderId('new'); setScreen('clubrideredit'); }} className="bg-yellow-300 text-stone-900 px-3 py-1.5 rounded-md flex items-center gap-1 shadow">
             <Plus size={16} strokeWidth={3} />
             <span className="text-[10px] font-black uppercase tracking-widest">Añadir</span>
           </button>
         } />
         <div className="px-5 pt-3">
-          {/* Resumen */}
           <div className="grid grid-cols-4 gap-2 mb-4">
             {[
               { label: 'Alumnos', count: clubRiders.filter(r => r.role === 'alumno' && r.status !== 'baja').length, color: 'from-sky-400 to-sky-600' },
@@ -2345,14 +2335,12 @@ function Ecumanager() {
           </button>
         } />
         <div className="px-5 pt-4 pb-8">
-          {/* Nombre */}
           <label className="block mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Nombre completo *</div>
             <input type="text" value={form.name} onChange={(e) => update('name', e.target.value)} placeholder="Nombre y apellidos"
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm font-bold focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Rol */}
           <div className="mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Rol en el club *</div>
             <div className="grid grid-cols-2 gap-2">
@@ -2366,7 +2354,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Categoría + Nivel */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Categoría</div>
@@ -2384,7 +2371,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Contacto */}
           <label className="block mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Email</div>
             <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="ejemplo@correo.com"
@@ -2403,7 +2389,6 @@ function Ecumanager() {
             </label>
           </div>
 
-          {/* Caballos vinculados (solo lectura) */}
           {existing && linkedHorses.length > 0 && (
             <div className="mb-4">
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Caballos vinculados ({linkedHorses.length})</div>
@@ -2425,7 +2410,6 @@ function Ecumanager() {
             </div>
           )}
 
-          {/* Notas */}
           <label className="block mb-5">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Notas</div>
             <textarea value={form.notes} onChange={(e) => update('notes', e.target.value)} rows={3}
@@ -2433,7 +2417,6 @@ function Ecumanager() {
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm resize-none focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Acciones */}
           {!isNew && (
             <div className="border-t-2 border-stone-100 pt-5 space-y-2">
               {existing?.status !== 'baja' ? (
@@ -2461,6 +2444,7 @@ function Ecumanager() {
     );
   };
 
+
   // =====================================================================
   // CONFIGURACIÓN DEL CLUB
   // =====================================================================
@@ -2471,7 +2455,7 @@ function Ecumanager() {
     const handleSave = () => {
       if (!form.name.trim()) { alert('El nombre del club es obligatorio.'); return; }
       saveClubConfig(form);
-      setScreen('profile');
+      setScreen('clubmore');
     };
 
     const handleReset = () => {
@@ -2492,7 +2476,11 @@ function Ecumanager() {
           const ext = (file.name.split('.').pop() || 'png').toLowerCase();
           const path = `${clubCode}/logo.${ext}`;
           const publicUrl = await uploadDataUrl(path, e.target.result);
-          update('logo', publicUrl);
+          const nextForm = { ...form, logo: publicUrl };
+          setForm(nextForm);
+          // Guardar también en cloud config inmediatamente (fix sync)
+          saveClubConfig(nextForm);
+          await saveImmediateAfterUpload({ clubConfig: nextForm });
           setSyncStatus('ok'); setSyncMessage('Logo sincronizado');
           setTimeout(() => setSyncStatus('idle'), 1500);
         } catch (err) {
@@ -2504,7 +2492,6 @@ function Ecumanager() {
       reader.readAsDataURL(file);
     };
 
-    // Paletas predefinidas
     const palettes = [
       { name: 'Clásico', primary: '#1c1917', accent: '#FDE047' },
       { name: 'Burdeos', primary: '#7F1D1D', accent: '#FCA5A5' },
@@ -2516,14 +2503,13 @@ function Ecumanager() {
 
     return (
       <>
-        <Header title="Configuración del club" back={() => setScreen('profile')} action={
+        <Header title="Configuración del club" back={() => setScreen('clubmore')} action={
           <button onClick={handleSave} className="bg-yellow-300 text-stone-900 px-3 py-1.5 rounded-md flex items-center gap-1 shadow">
             <Check size={16} strokeWidth={3} />
             <span className="text-[10px] font-black uppercase tracking-widest">Guardar</span>
           </button>
         } />
         <div className="px-5 pt-4 pb-8">
-          {/* Preview branding */}
           <div className="rounded-3xl p-5 mb-5 flex items-center gap-4" style={{ background: form.primaryColor, color: 'white' }}>
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: form.accentColor }}>
               {form.logo ? (
@@ -2539,7 +2525,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Nombre */}
           <label className="block mb-4">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Nombre del club *</div>
             <input type="text" value={form.name} onChange={(e) => update('name', e.target.value)}
@@ -2558,7 +2543,6 @@ function Ecumanager() {
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm font-bold focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Logo */}
           <div className="mb-5">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Logo del club</div>
             <div className="flex items-center gap-3">
@@ -2582,7 +2566,6 @@ function Ecumanager() {
             <div className="text-[10px] text-stone-500 mt-1.5">Recomendado: cuadrado, mínimo 200×200px. Máx 2MB.</div>
           </div>
 
-          {/* Paletas */}
           <div className="mb-5">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Paleta corporativa</div>
             <div className="grid grid-cols-3 gap-2">
@@ -2602,7 +2585,6 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Colores custom */}
           <div className="grid grid-cols-2 gap-3 mb-5">
             <label className="block">
               <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Color principal</div>
@@ -2620,7 +2602,6 @@ function Ecumanager() {
             </label>
           </div>
 
-          {/* Mensaje de bienvenida */}
           <label className="block mb-5">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1.5">Mensaje de bienvenida</div>
             <textarea value={form.welcomeMessage} onChange={(e) => update('welcomeMessage', e.target.value)} rows={3}
@@ -2628,12 +2609,12 @@ function Ecumanager() {
               className="w-full border-2 border-stone-200 rounded-xl p-3 text-sm resize-none focus:border-yellow-400 outline-none" />
           </label>
 
-          {/* Datos */}
           <div className="bg-stone-50 rounded-2xl p-4 mb-5">
             <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-3">Datos almacenados</div>
             <div className="space-y-1 text-xs text-stone-700">
               <div className="flex justify-between"><span>Caballos del club</span><span className="font-black">{clubHorses.length}</span></div>
               <div className="flex justify-between"><span>Jinetes registrados</span><span className="font-black">{clubRiders.length}</span></div>
+              <div className="flex justify-between"><span>Clases programadas</span><span className="font-black">{clubClasses.length}</span></div>
               <div className="flex justify-between"><span>Fotos de caballos</span><span className="font-black">{Object.keys(customImages).length}</span></div>
               <div className="flex justify-between"><span>Fotos de insignias</span><span className="font-black">{Object.keys(badgeImages).length}</span></div>
             </div>
@@ -2676,9 +2657,8 @@ function Ecumanager() {
 
     return (
       <>
-        <Header title="Personalizar insignias" back={() => setScreen('profile')} />
+        <Header title="Personalizar insignias" back={() => setScreen('clubmore')} />
         <div className="px-5 pt-3">
-          {/* Resumen */}
           <div className="bg-gradient-to-br from-yellow-300 to-yellow-400 rounded-3xl p-5 mb-4">
             <div className="text-[10px] font-black text-stone-900/70 uppercase tracking-widest">Personalización del club</div>
             <div className="flex items-baseline gap-1 mt-1">
@@ -2691,22 +2671,19 @@ function Ecumanager() {
             </div>
           </div>
 
-          {/* Tip */}
           <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 mb-4 flex gap-2">
             <div className="text-lg">💡</div>
             <div className="text-xs text-stone-700 leading-relaxed">
-              Sube fotos reales del club (jinetes, caballos, momentos) para que las insignias de tus alumnos sean únicas. Las fotos aparecerán en el centro de cada insignia.
+              Sube fotos reales del club para que las insignias de tus alumnos sean únicas. Las fotos aparecerán en el centro de cada insignia.
             </div>
           </div>
 
-          {/* Filtros */}
           <div className="flex gap-2 mb-4 overflow-x-auto -mx-5 px-5 pb-1">
             {filters.map(f => (
               <button key={f} onClick={() => setClubBadgeFilter(f)} className={`px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-wider whitespace-nowrap ${clubBadgeFilter === f ? 'bg-stone-900 text-yellow-300' : 'bg-stone-100 text-stone-600'}`}>{f}</button>
             ))}
           </div>
 
-          {/* Lista compacta para gestión */}
           <div className="space-y-2">
             {filtered.map(b => {
               const isLocked = !b.unlocked;
@@ -2755,10 +2732,9 @@ function Ecumanager() {
     );
   };
 
+
   const renderScreen = () => {
-    // Pantallas solo para club
     const clubOnly = ['clubhome','clubhorses','clubhorseedit','clubriders','clubrideredit','clubconfig','clubbadges','clubclasses','clubclassedit','clubmore'];
-    // Pantallas solo para jinete
     const riderOnly = ['horse','myhorse','next','badge'];
 
     if (clubOnly.includes(screen) && userType !== 'club') return <HomeScreen />;
@@ -2787,14 +2763,14 @@ function Ecumanager() {
 
   // === Pantalla de entrada: elegir tipo + código de club ===
   const ClubCodeScreen = () => {
-    const [step, setStep] = useState('choose'); // 'choose' | 'club' | 'rider'
+    const [step, setStep] = useState('choose');
     const [code, setCode] = useState('');
     const [name, setName] = useState('');
 
     const enterAsClub = () => {
       const clean = sanitizeClubCode(code);
       if (clean.length < 3) { alert('El código debe tener al menos 3 caracteres.'); return; }
-      try { localStorage.setItem('ecumanager_user_type', 'club'); } catch (e) {}
+      try { localStorage.setItem('equmanager_user_type', 'club'); } catch (e) {}
       setUserType('club');
       setClubCode(clean);
     };
@@ -2804,8 +2780,8 @@ function Ecumanager() {
       if (clean.length < 3) { alert('El código del club debe tener al menos 3 caracteres.'); return; }
       if (!name.trim()) { alert('Indica tu nombre.'); return; }
       try {
-        localStorage.setItem('ecumanager_user_type', 'rider');
-        localStorage.setItem('ecumanager_rider_name', name.trim());
+        localStorage.setItem('equmanager_user_type', 'rider');
+        localStorage.setItem('equmanager_rider_name', name.trim());
       } catch (e) {}
       setUserType('rider');
       setRiderName(name.trim());
@@ -2817,7 +2793,7 @@ function Ecumanager() {
         <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-stone-900 via-stone-800 to-stone-900">
           <div className="flex-1 flex flex-col items-center justify-center px-6 text-white">
             <div className="text-6xl mb-4">🏇</div>
-            <div className="text-3xl font-black mb-1">Ecumanager</div>
+            <div className="text-3xl font-black mb-1">Equmanager</div>
             <div className="text-sm text-stone-400 font-bold mb-10 text-center max-w-xs">¿Cómo entras a la app?</div>
 
             <div className="w-full max-w-xs space-y-3">
@@ -2843,7 +2819,6 @@ function Ecumanager() {
       );
     }
 
-    // Formulario para club o jinete
     const isClub = step === 'club';
     return (
       <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-stone-900 via-stone-800 to-stone-900">
@@ -2933,7 +2908,7 @@ function Ecumanager() {
   );
 }
 
-// === Error Boundary: si algo peta, lo muestra en pantalla en vez de quedarse en blanco ===
+// === Error Boundary ===
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null, info: null }; }
   static getDerivedStateFromError(error) { return { error }; }
@@ -2961,11 +2936,10 @@ class ErrorBoundary extends React.Component {
 // === Espera a que el SDK de Supabase esté cargado antes de montar la app ===
 function mountApp() {
   if (!window.supabase || !window.supabase.createClient) {
-    // Reintenta cada 50ms hasta 5 segundos
     if (!window._mountAttempts) window._mountAttempts = 0;
     window._mountAttempts++;
     if (window._mountAttempts > 100) {
-      document.getElementById('root').innerHTML = '<div style="padding:20px;font-family:monospace;color:#900"><h1>⚠️ No se pudo cargar el SDK de Supabase</h1><p>Comprueba tu conexión y recarga la página. Si el problema persiste, puede ser que unpkg.com esté caído.</p></div>';
+      document.getElementById('root').innerHTML = '<div style="padding:20px;font-family:monospace;color:#900"><h1>⚠️ No se pudo cargar el SDK de Supabase</h1><p>Comprueba tu conexión y recarga la página.</p></div>';
       return;
     }
     setTimeout(mountApp, 50);
@@ -2973,7 +2947,7 @@ function mountApp() {
   }
   try {
     ReactDOM.createRoot(document.getElementById('root')).render(
-      <ErrorBoundary><Ecumanager /></ErrorBoundary>
+      <ErrorBoundary><Equmanager /></ErrorBoundary>
     );
   } catch (e) {
     document.getElementById('root').innerHTML = '<div style="padding:20px;font-family:monospace;color:#900"><h1>⚠️ Error al iniciar</h1><pre>' + (e.message || e) + '</pre></div>';
