@@ -88,23 +88,58 @@ function Ecumanager() {
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   };
 
-  // Fotos reales de caballos. Si alguna no carga, cambia la URL por una tuya.
-  // Para reemplazar: ve a Google → "horse breed bay portrait" → click derecho en la foto → "Copy image address"
-  const horseImages = {
-    Tornado:  'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Nokota_Horses_cropped.jpg/640px-Nokota_Horses_cropped.jpg',
-    Luna:     'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Palomino.jpg/640px-Palomino.jpg',
-    Trueno:   'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Friesian_Horse_%28cropped%29.jpg/640px-Friesian_Horse_%28cropped%29.jpg',
-    Estrella: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Andalusian_horse-2.jpg/640px-Andalusian_horse-2.jpg',
-    Centella: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Arabian_horse.jpg/640px-Arabian_horse.jpg',
-    Rayo:     'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/HanoverianGelding.jpg/640px-HanoverianGelding.jpg',
-    Kaiser:   'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Friesian_Horse_%28cropped%29.jpg/640px-Friesian_Horse_%28cropped%29.jpg',
+  // Fotos de caballos - SOLO las que sube el usuario, guardadas en localStorage
+  const [customImages, setCustomImages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ecumanager_horse_images');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) { return {}; }
+  });
+
+  // Handler para subir foto
+  const handleImageUpload = (horseName, event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La foto es muy grande. Por favor, elige una menor de 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const newImages = { ...customImages, [horseName]: e.target.result };
+      setCustomImages(newImages);
+      try {
+        localStorage.setItem('ecumanager_horse_images', JSON.stringify(newImages));
+      } catch (err) {
+        alert('No se pudo guardar la foto. La memoria del navegador está llena.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Devuelve la foto del caballo o null si no hay
+  const imgOf = (name) => customImages[name] || null;
+
+  // Componente placeholder cuando no hay foto del caballo
+  const HorsePlaceholder = ({ name, className = '' }) => (
+    <div className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-stone-200 to-stone-300 ${className}`}>
+      <div className="text-4xl opacity-40 mb-1">🐎</div>
+      <div className="text-[9px] font-black text-stone-500 uppercase tracking-widest">{name}</div>
+    </div>
+  );
+
+  // Componente que muestra la foto o el placeholder
+  const HorseImg = ({ name, className = '', alt }) => {
+    const src = imgOf(name);
+    if (!src) return <HorsePlaceholder name={name} />;
+    return <img src={src} alt={alt || name} className={className} />;
   };
 
   const feed = [
     { id: 1, horse: 'Tornado', date: 'Hoy', time: '18:30', duration: '1h 15min', feeling: 'Conexión', feelingColor: '#10b981', intensity: 4, note: 'Tornado respondió genial al galope. Transiciones limpias y suelto.', hasPhoto: true, milestone: false },
     { id: 2, horse: 'Luna', date: 'Ayer', time: '17:00', duration: '1h', feeling: 'Tranquila', feelingColor: '#3b82f6', intensity: 3, note: 'Clase de doma. Mucho trabajo de flexión.', hasPhoto: false, milestone: false },
     { id: 3, horse: 'Trueno', date: '20 May', time: '19:00', duration: '1h 30min', feeling: 'Intensa', feelingColor: '#f59e0b', intensity: 5, note: 'Primer salto de 1m. ¡Lo logramos!', hasPhoto: true, milestone: true },
-  ].map(f => ({ ...f, horseImage: horseImages[f.horse], ridePhoto: horseImages[f.horse] }));
+  ];
 
   const horses = [
     { name: 'Tornado', color: '#8B5A3C', rides: 23, lastRide: 'Hoy', connection: 92, type: 'Castaño · 7 años', breed: 'PRE × Hannoveriano', height: '1.68m', favorite: true, totalRiders: 4, since: '2018' },
@@ -113,9 +148,12 @@ function Ecumanager() {
     { name: 'Estrella', color: '#B8B0A8', rides: 11, lastRide: '5 días', connection: 71, type: 'Tordo · 10 años', breed: 'PRE', height: '1.62m', favorite: false, totalRiders: 9, since: '2015' },
     { name: 'Centella', color: '#A0826D', rides: 8, lastRide: '2 sem', connection: 64, type: 'Alazán · 8 años', breed: 'Hispano-Árabe', height: '1.63m', favorite: false, totalRiders: 6, since: '2017' },
     { name: 'Rayo', color: '#3D2817', rides: 6, lastRide: '3 sem', connection: 58, type: 'Castaño oscuro · 5 años', breed: 'KWPN', height: '1.66m', favorite: false, totalRiders: 2, since: '2021' },
-  ].map(h => ({ ...h, image: horseImages[h.name] }));
+  ];
 
-  const myHorses = [{ name: 'Káiser', color: '#3D2817', image: horseImages.Kaiser, breed: 'KWPN', height: '1.70m', microchip: '981100002847163', die: 'ES-2018-0084712', birthDate: '12 Abr 2018', sex: 'Macho castrado', stable: 'Box 14 · Cuadra Sur', since: 'Marzo 2022', weight: 542, weightTrend: '+3', condition: 5, mood: 'Activo', moodEmoji: '⚡', ridesMonth: 18, hoursMonth: 22 }];
+  const myHorses = [{ name: 'Káiser', imgKey: 'Kaiser', color: '#3D2817', breed: 'KWPN', height: '1.70m', microchip: '981100002847163', die: 'ES-2018-0084712', birthDate: '12 Abr 2018', sex: 'Macho castrado', stable: 'Box 14 · Cuadra Sur', since: 'Marzo 2022', weight: 542, weightTrend: '+3', condition: 5, mood: 'Activo', moodEmoji: '⚡', ridesMonth: 18, hoursMonth: 22 }];
+
+  // Helper: dame la imagen de un caballo
+  const imgOf = (name) => horseImages[name] || horseImages.Tornado;
 
   const healthRecords = [
     { id: 1, icon: '🏥', title: 'Revisión general', date: '15 Abr 2026', vet: 'Dr. Martínez', notes: 'Todo correcto.', cost: 85 },
@@ -293,7 +331,7 @@ function Ecumanager() {
                 <div key={ride.id} className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                   {ride.hasPhoto && (
                     <div className="h-36 relative">
-                      <img src={ride.ridePhoto} alt={ride.horse} className="w-full h-full object-cover" />
+                      <HorseImg name={ride.horse} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20"></div>
                       {ride.milestone && <div className="absolute top-3 right-3 bg-yellow-300 text-stone-900 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1 shadow-lg"><Trophy size={12} /> Insignia ganada</div>}
                     </div>
@@ -301,7 +339,7 @@ function Ecumanager() {
                   <div className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full overflow-hidden shadow ring-2 ring-white"><img src={ride.horseImage} alt={ride.horse} className="w-full h-full object-cover" /></div>
+                        <div className="w-10 h-10 rounded-full overflow-hidden shadow ring-2 ring-white"><HorseImg name={ride.horse} className="w-full h-full object-cover" /></div>
                         <div>
                           <div className="font-black text-stone-900">{ride.horse}</div>
                           <div className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">{ride.date} · {ride.time} · {ride.duration}</div>
@@ -422,7 +460,7 @@ function Ecumanager() {
             {myHorses.map(h => (
               <button key={h.name} onClick={() => { setSelectedHorse(h); setHorseDetailTab('resumen'); setScreen('myhorse'); }} className="w-full bg-white border border-stone-200 rounded-3xl overflow-hidden text-left mb-4">
                 <div className="h-56 relative overflow-hidden">
-                  <img src={h.image} alt={h.name} className="w-full h-full object-cover" />
+                  <HorseImg name="Kaiser" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
                   <div className="absolute top-3 left-3 bg-yellow-300 px-2 py-1 rounded-md"><div className="text-[10px] font-black text-stone-900 uppercase tracking-widest">⭐ Tu caballo</div></div>
                   <div className="absolute bottom-3 left-4 right-4 text-white">
@@ -451,8 +489,8 @@ function Ecumanager() {
           <div className="grid grid-cols-2 gap-3">
             {horses.map(horse => (
               <button key={horse.name} onClick={() => { setSelectedHorse(horse); setScreen('horse'); }} className="bg-white border border-stone-200 rounded-2xl overflow-hidden text-left">
-                <div className="h-32 relative overflow-hidden bg-stone-100">
-                  <img src={horse.image} alt={horse.name} className="w-full h-full object-cover block" />
+                <div className="h-32 relative overflow-hidden">
+                  <HorseImg name={horse.name} className="w-full h-full object-cover block" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
                   {horse.favorite && <div className="absolute top-2 right-2 bg-white/30 rounded-full p-1.5"><Heart size={12} className="text-white" fill="white" /></div>}
                   <div className="absolute bottom-2 left-3 text-white font-black text-xl drop-shadow-lg">{horse.name}</div>
@@ -481,8 +519,12 @@ function Ecumanager() {
         <Header title={h.name} back={() => setScreen('horses')} />
         <div className="pb-8">
           <div className="h-64 relative overflow-hidden">
-            <img src={h.image} alt={h.name} className="w-full h-full object-cover" />
+            <HorseImg name={h.name} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30"></div>
+            <label className="absolute top-3 right-3 bg-white/90 px-3 py-1.5 rounded-md shadow-lg cursor-pointer active:scale-95 transition">
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(h.name, e)} />
+              <div className="text-[10px] font-black text-stone-900 uppercase tracking-widest flex items-center gap-1">📷 Cambiar foto</div>
+            </label>
             <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
               <div className="text-4xl font-black drop-shadow-lg">{h.name}</div>
               <div className="text-sm font-bold opacity-90">{h.breed} · {h.height}</div>
@@ -748,7 +790,7 @@ function Ecumanager() {
             <div className="grid grid-cols-2 gap-3">
               {horses.map(h => (
                 <button key={h.name} onClick={() => { setLogData({ ...logData, horse: h.name }); setLoggerStep(2); }} className="bg-white border-2 border-stone-200 rounded-2xl p-3 text-left">
-                  <div className="w-full aspect-square rounded-xl mb-2 overflow-hidden"><img src={h.image} alt={h.name} className="w-full h-full object-cover" /></div>
+                  <div className="w-full aspect-square rounded-xl mb-2 overflow-hidden"><HorseImg name={h.name} className="w-full h-full object-cover" /></div>
                   <div className="font-black text-sm text-stone-900">{h.name}</div>
                 </button>
               ))}
