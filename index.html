@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="theme-color" content="#1c1917" />
-<title>Equmanager</title>
+<title>Equmanager · debug</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -58,6 +58,20 @@ const { useState, useEffect, useRef } = React;
 const SUPABASE_URL = 'https://mbpmoipqcaaudwtzjydn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UJsJcTAfaU-Vuo3NTNzbRg_mceqVPu0';
 const SUPABASE_BUCKET = 'ecumanager';
+const APP_VERSION = 'v3-debug-2026-05-24';
+
+// === Registro de debug global ===
+// Cualquier parte de la app puede llamar a debugAdd(tag, info) para que aparezca en el panel
+window._debugLog = window._debugLog || [];
+function debugAdd(tag, info) {
+  const entry = { ts: new Date().toISOString(), tag, info };
+  window._debugLog.push(entry);
+  if (window._debugLog.length > 200) window._debugLog.shift();
+  try { console.log('[DEBUG]', tag, info); } catch (e) {}
+  // Notificar a React si está escuchando
+  if (window._onDebug) try { window._onDebug(entry); } catch (e) {}
+}
+debugAdd('boot', { version: APP_VERSION, ua: navigator.userAgent, url: location.href });
 
 let _supabase = null;
 function getSupabase() {
@@ -70,35 +84,84 @@ function getSupabase() {
 }
 
 async function uploadDataUrl(path, dataUrl) {
+  debugAdd('upload:start', { path, bucket: SUPABASE_BUCKET, dataUrlLen: dataUrl.length });
   const res = await fetch(dataUrl);
   const blob = await res.blob();
+  debugAdd('upload:blob', { path, size: blob.size, type: blob.type });
   const { error } = await getSupabase().storage.from(SUPABASE_BUCKET).upload(path, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
-  if (error) throw error;
+  if (error) {
+    debugAdd('upload:ERROR', { path, msg: error.message || String(error), statusCode: error.statusCode || null });
+    throw error;
+  }
+  debugAdd('upload:ok', { path });
   const { data } = getSupabase().storage.from(SUPABASE_BUCKET).getPublicUrl(path);
-  // Cache-buster: como upsert reemplaza el blob pero la URL pública es la misma,
-  // añadimos un timestamp para forzar a los clientes a descargar la versión nueva.
-  return data.publicUrl + '?t=' + Date.now();
+  const publicUrl = data.publicUrl + '?t=' + Date.now();
+  debugAdd('upload:url', { path, publicUrl });
+  // Verificar accesibilidad pública (detecta bucket privado / RLS / CORS)
+  try {
+    const probe = await fetch(publicUrl, { method: 'GET' });
+    debugAdd('upload:probe', { path, status: probe.status, ok: probe.ok, contentType: probe.headers.get('content-type') });
+    if (!probe.ok) {
+      debugAdd('upload:PROBE_FAIL', { path, status: probe.status, hint: 'Bucket "' + SUPABASE_BUCKET + '" no es público o no permite SELECT. Verifica en Supabase Storage > policies.' });
+    }
+  } catch (e) {
+    debugAdd('upload:probe-error', { path, error: e.message });
+  }
+  return publicUrl;
 }
 
 async function cloudLoad(clubCode) {
+  debugAdd('cloudLoad:start', { clubCode });
   const { data, error } = await getSupabase()
     .from('club_data')
     .select('data, updated_at')
     .eq('club_code', clubCode)
     .maybeSingle();
-  if (error) throw error;
-  return data ? { data: data.data, updatedAt: data.updated_at } : null;
+  if (error) {
+    debugAdd('cloudLoad:ERROR', { clubCode, msg: error.message || String(error), code: error.code });
+    throw error;
+  }
+  if (!data) {
+    debugAdd('cloudLoad:empty', { clubCode });
+    return null;
+  }
+  const summary = {
+    clubCode,
+    updatedAt: data.updated_at,
+    horses: (data.data && data.data.clubHorses ? data.data.clubHorses.length : 0),
+    riders: (data.data && data.data.clubRiders ? data.data.clubRiders.length : 0),
+    customImagesKeys: Object.keys((data.data && data.data.customImages) || {}),
+    badgeImagesKeys: Object.keys((data.data && data.data.badgeImages) || {}),
+  };
+  debugAdd('cloudLoad:ok', summary);
+  return { data: data.data, updatedAt: data.updated_at };
 }
 
 async function cloudSave(clubCode, payload) {
+  const summary = {
+    clubCode,
+    horses: (payload.clubHorses || []).length,
+    riders: (payload.clubRiders || []).length,
+    customImagesKeys: Object.keys(payload.customImages || {}),
+    badgeImagesKeys: Object.keys(payload.badgeImages || {}),
+  };
+  debugAdd('cloudSave:start', summary);
   const { error } = await getSupabase()
     .from('club_data')
     .upsert({ club_code: clubCode, data: payload, updated_at: new Date().toISOString() }, { onConflict: 'club_code' });
-  if (error) throw error;
+  if (error) {
+    debugAdd('cloudSave:ERROR', { clubCode, msg: error.message || String(error), code: error.code });
+    throw error;
+  }
+  debugAdd('cloudSave:ok', summary);
 }
 
 function sanitizeClubCode(code) {
   return (code || '').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+}
+
+function tryLS(key) {
+  try { return localStorage.getItem(key) || null; } catch (e) { return null; }
 }
 
 const Icon = ({ d, size = 20, strokeWidth = 2, className = '', fill = 'none' }) => (
@@ -136,6 +199,10 @@ function Equmanager() {
   const [syncMessage, setSyncMessage] = useState('');
   const initialLoadDone = useRef(false);
   const lastSavedUpdatedAt = useRef(null);
+  // skipNextSaveCount: contador para que el siguiente useEffect de save debounced sea saltado.
+  // Lo incrementamos cuando hacemos un setState que viene de la nube (loadFromCloud)
+  // o de un upload inmediato, para evitar bucles de re-save.
+  const skipNextSaveCount = useRef(0);
   // Refs vivos para que el polling lea siempre el estado actual sin cerrar capturas
   const stateRef = useRef({});
 
@@ -161,6 +228,20 @@ function Equmanager() {
   const [customImages, setCustomImages] = useState({});
   const [badgeImages, setBadgeImages] = useState({});
 
+  // Debug panel state - se rellena vía window._debugLog
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugEntries, setDebugEntries] = useState(() => (window._debugLog || []).slice());
+  useEffect(() => {
+    window._onDebug = (entry) => {
+      setDebugEntries(prev => {
+        const next = prev.concat([entry]);
+        if (next.length > 200) next.shift();
+        return next;
+      });
+    };
+    return () => { window._onDebug = null; };
+  }, []);
+
   const [userType, setUserType] = useState(() => {
     try { return localStorage.getItem('equmanager_user_type') || ''; } catch (e) { return ''; }
   });
@@ -185,8 +266,14 @@ function Equmanager() {
         ...overrides,
       };
       await cloudSave(clubCode, payload);
+      lastSavedUpdatedAt.current = new Date().toISOString();
+      // Saltar el siguiente debounce que se va a disparar por los setStates de overrides
+      skipNextSaveCount.current++;
+      debugAdd('saveImmediate:ok', { keys: Object.keys(overrides || {}) });
     } catch (err) {
       console.error('Guardado inmediato falló:', err);
+      debugAdd('saveImmediate:ERROR', { msg: err.message || String(err) });
+      throw err;
     }
   };
 
@@ -467,17 +554,23 @@ function Equmanager() {
           return;
         }
         lastSavedUpdatedAt.current = result.updatedAt;
+        // Estos 6 setters dispararán el useEffect debounced de save. Como los datos VIENEN
+        // de la nube, NO queremos que se re-guarden. skipNextSaveCount lo evita.
+        skipNextSaveCount.current++;
         setClubHorses(data.clubHorses || []);
         setClubRiders(data.clubRiders || []);
         setClubConfig({ ...defaultClubConfig, ...(data.clubConfig || {}) });
         setCustomImages(data.customImages || {});
         setBadgeImages(data.badgeImages || {});
         setClubClasses(data.clubClasses || []);
+        debugAdd('loadFromCloud:applied', { silent, customImagesKeys: Object.keys(data.customImages || {}) });
         if (!silent) setSyncMessage('Sincronizado');
       } else {
         // Club nuevo: sembrar con datos por defecto (tanto si entras como club como jinete).
         // Si entras como jinete a un club inexistente, también sembramos para que veas algo,
         // y guardamos inmediatamente en la nube para que el admin (cuando entre) lo encuentre.
+        // skipNextSave para que el useEffect debounced no haga otro save duplicado.
+        skipNextSaveCount.current++;
         setClubHorses(defaultClubHorses);
         setClubRiders(defaultClubRiders);
         setClubConfig(defaultClubConfig);
@@ -530,6 +623,13 @@ function Equmanager() {
   // Sube con debounce cuando cambia algo de los datos persistentes
   useEffect(() => {
     if (!clubCode || !initialLoadDone.current) return;
+    // Si el cambio que provocó este efecto viene de la nube o de un upload inmediato,
+    // consumir el contador y NO guardar (evita bucles).
+    if (skipNextSaveCount.current > 0) {
+      skipNextSaveCount.current--;
+      debugAdd('debouncedSave:skipped', { remaining: skipNextSaveCount.current });
+      return;
+    }
     const handle = setTimeout(async () => {
       try {
         setSyncStatus('syncing');
@@ -2866,7 +2966,142 @@ function Equmanager() {
     );
   };
 
-  // === Indicador flotante de sincronización ===
+  // === Panel de Debug ===
+  // Se abre con el botón 🐛 de la cabecera. Muestra version, supabase config,
+  // último log de operaciones de I/O y permite hacer un test manual de la nube.
+  const DebugPanel = () => {
+    const [testResult, setTestResult] = useState(null);
+    const [busy, setBusy] = useState(false);
+
+    const runTest = async () => {
+      setBusy(true);
+      setTestResult(null);
+      const summary = {
+        appVersion: APP_VERSION,
+        ua: navigator.userAgent,
+        url: location.href,
+        userType, clubCode, riderName,
+        localStorage: {
+          user_type: tryLS('equmanager_user_type'),
+          club_code: tryLS('equmanager_club_code'),
+          rider_name: tryLS('equmanager_rider_name'),
+        },
+        supabaseClient: !!(window.supabase && window.supabase.createClient),
+      };
+      debugAdd('test:start', summary);
+      try {
+        // 1. Probar conexión leyendo el registro actual
+        const loaded = await cloudLoad(clubCode);
+        summary.cloudLoad = loaded ? {
+          ok: true,
+          updatedAt: loaded.updatedAt,
+          horseCount: (loaded.data.clubHorses || []).length,
+          customImageCount: Object.keys(loaded.data.customImages || {}).length,
+          customImageKeys: Object.keys(loaded.data.customImages || {}),
+          customImageSample: Object.entries(loaded.data.customImages || {}).slice(0, 2),
+        } : { ok: true, empty: true };
+        // 2. Si hay imágenes, probar acceso a la primera
+        const firstImg = loaded && loaded.data.customImages ? Object.values(loaded.data.customImages)[0] : null;
+        if (firstImg) {
+          try {
+            const probe = await fetch(firstImg, { method: 'GET' });
+            summary.imageProbe = { url: firstImg, status: probe.status, ok: probe.ok };
+          } catch (e) {
+            summary.imageProbe = { url: firstImg, error: e.message };
+          }
+        }
+        setTestResult(summary);
+        debugAdd('test:ok', summary);
+      } catch (e) {
+        summary.error = e.message || String(e);
+        setTestResult(summary);
+        debugAdd('test:ERROR', summary);
+      }
+      setBusy(false);
+    };
+
+    const copyAll = () => {
+      const txt = JSON.stringify({
+        version: APP_VERSION,
+        ua: navigator.userAgent,
+        url: location.href,
+        userType, clubCode, riderName,
+        clubHorses_count: clubHorses.length,
+        customImages,
+        badgeImages,
+        debugLog: debugEntries,
+        testResult,
+      }, null, 2);
+      try {
+        navigator.clipboard.writeText(txt);
+        alert('Copiado al portapapeles. Pégalo en el chat.');
+      } catch (e) {
+        prompt('Copia este texto a mano:', txt);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/80 z-[100] overflow-y-auto" onClick={() => setShowDebug(false)}>
+        <div className="min-h-screen px-3 py-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl max-w-2xl mx-auto overflow-hidden">
+            <div className="bg-stone-900 text-yellow-300 px-4 py-3 flex items-center justify-between">
+              <div className="font-black text-sm">🐛 DEBUG · {APP_VERSION}</div>
+              <button onClick={() => setShowDebug(false)} className="bg-yellow-300 text-stone-900 px-2 py-1 rounded text-xs font-black">CERRAR</button>
+            </div>
+            <div className="p-4 space-y-3 text-xs font-mono">
+              <div className="bg-stone-50 rounded p-2">
+                <div className="font-black mb-1">Entorno</div>
+                <div>userType: <b>{userType || '—'}</b></div>
+                <div>clubCode: <b>{clubCode || '—'}</b></div>
+                <div>riderName: <b>{riderName || '—'}</b></div>
+                <div className="break-all">UA: {navigator.userAgent}</div>
+                <div>Bucket: <b>{SUPABASE_BUCKET}</b></div>
+                <div>Supabase client: <b>{(window.supabase && window.supabase.createClient) ? 'OK' : 'NO CARGADO'}</b></div>
+                <div>clubHorses (memoria): <b>{clubHorses.length}</b></div>
+                <div>customImages keys: <b>{Object.keys(customImages).join(', ') || '(ninguna)'}</b></div>
+              </div>
+
+              <div className="flex gap-2">
+                <button disabled={busy} onClick={runTest} className="flex-1 bg-stone-900 text-yellow-300 font-black py-2 rounded">
+                  {busy ? 'Probando…' : '🧪 PROBAR CONEXIÓN'}
+                </button>
+                <button onClick={copyAll} className="flex-1 bg-yellow-300 text-stone-900 font-black py-2 rounded">📋 COPIAR TODO</button>
+              </div>
+
+              {testResult && (
+                <div className="bg-stone-900 text-green-300 rounded p-2 overflow-x-auto">
+                  <div className="font-black text-yellow-300 mb-1">Resultado del test:</div>
+                  <pre className="text-[10px] whitespace-pre-wrap break-all">{JSON.stringify(testResult, null, 2)}</pre>
+                </div>
+              )}
+
+              <div className="bg-stone-900 text-stone-200 rounded p-2 overflow-x-auto max-h-96 overflow-y-auto">
+                <div className="font-black text-yellow-300 mb-1">Log ({debugEntries.length} entradas, más recientes abajo)</div>
+                {debugEntries.length === 0 && <div className="text-stone-500">Sin entradas todavía.</div>}
+                {debugEntries.slice(-60).map((e, i) => (
+                  <div key={i} className="border-b border-stone-700 py-1">
+                    <div className="text-yellow-300 text-[9px]">{e.ts.slice(11,19)} · <span className="text-white">{e.tag}</span></div>
+                    <pre className="text-[9px] whitespace-pre-wrap break-all">{typeof e.info === 'string' ? e.info : JSON.stringify(e.info)}</pre>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-stone-50 rounded p-2 text-[10px]">
+                <div className="font-black mb-1">Acciones</div>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <button onClick={() => { try { localStorage.clear(); } catch(e){}; location.reload(); }} className="bg-red-600 text-white px-2 py-1 rounded font-black">🗑️ Limpiar local y recargar</button>
+                  <button onClick={() => location.reload()} className="bg-stone-700 text-white px-2 py-1 rounded font-black">🔄 Recargar app</button>
+                  <button onClick={() => refreshFromCloud()} className="bg-blue-600 text-white px-2 py-1 rounded font-black">☁️ Forzar resync</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
   const SyncIndicator = () => {
     if (syncStatus === 'idle') return null;
     const styles = {
@@ -2886,7 +3121,13 @@ function Equmanager() {
 
   // Si falta tipo de usuario o código de club, mostrar pantalla de entrada
   if (!userType || !clubCode) {
-    return <ClubCodeScreen />;
+    return (
+      <>
+        <ClubCodeScreen />
+        <button onClick={() => setShowDebug(true)} className="fixed bottom-4 right-4 z-50 bg-yellow-300 text-stone-900 w-12 h-12 rounded-full font-black text-xl shadow-lg" title="Diagnóstico">🐛</button>
+        {showDebug && <DebugPanel />}
+      </>
+    );
   }
 
   const isClubUser = userType === 'club';
@@ -2905,10 +3146,13 @@ function Equmanager() {
         </button>
         <span className="opacity-60">·</span>
         <span className="opacity-80">#{clubCode}</span>
+        <span className="opacity-60">·</span>
+        <button onClick={() => setShowDebug(true)} className="hover:opacity-80" title="Diagnóstico">🐛</button>
       </div>
       <div className="pb-24">{renderScreen()}</div>
       <div className="fixed bottom-0 left-0 right-0 z-40"><BottomNav /></div>
       {showLogger && <LoggerModal />}
+      {showDebug && <DebugPanel />}
     </div>
   );
 }
