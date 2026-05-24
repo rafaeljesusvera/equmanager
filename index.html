@@ -460,6 +460,15 @@ function Ecumanager() {
     } catch (e) {}
   }, [clubCode]);
 
+  // Al cambiar de tipo de usuario, llevar a la pantalla inicial adecuada
+  useEffect(() => {
+    if (userType === 'club' && (screen === 'home' || screen === '')) {
+      setScreen('clubhome');
+    } else if (userType === 'rider' && (screen === 'clubhome' || screen === '')) {
+      setScreen('home');
+    }
+  }, [userType]);
+
   // Función pública para forzar refresh (botón en UI)
   const refreshFromCloud = () => {
     if (!clubCode) return;
@@ -628,18 +637,31 @@ function Ecumanager() {
   );
 
   const BottomNav = () => {
-    const items = [
-      { id: 'home', icon: Home, label: 'Inicio' },
-      { id: 'badges', icon: Medal, label: 'Insignias' },
+    const isClub = userType === 'club';
+
+    const riderItems = [
+      { id: 'home', icon: Home, label: 'Inicio', activeOn: ['home'] },
+      { id: 'badges', icon: Medal, label: 'Insignias', activeOn: ['badges','badge'] },
       { id: 'add', icon: Plus, label: '', special: true },
-      { id: 'horses', icon: Heart, label: 'Caballos' },
-      { id: 'profile', icon: User, label: 'Perfil' },
+      { id: 'horses', icon: Heart, label: 'Caballos', activeOn: ['horses','horse','myhorse'] },
+      { id: 'profile', icon: User, label: 'Perfil', activeOn: ['profile','next'] },
     ];
+
+    const clubItems = [
+      { id: 'clubhome', icon: Home, label: 'Inicio', activeOn: ['clubhome','home'] },
+      { id: 'clubhorses', icon: Heart, label: 'Caballos', activeOn: ['clubhorses','clubhorseedit'] },
+      { id: 'clubriders', icon: User, label: 'Jinetes', activeOn: ['clubriders','clubrideredit'] },
+      { id: 'clubclasses', icon: Calendar, label: 'Clases', activeOn: ['clubclasses'] },
+      { id: 'clubmore', icon: Settings, label: 'Más', activeOn: ['clubmore','clubbadges','clubconfig','profile'] },
+    ];
+
+    const items = isClub ? clubItems : riderItems;
+
     return (
       <div className="bg-white border-t border-stone-100 px-2 pt-2 pb-6 flex items-center justify-around">
         {items.map(item => {
           const Ic = item.icon;
-          const active = screen === item.id || (item.id === 'badges' && screen === 'badge') || (item.id === 'horses' && (screen === 'horse' || screen === 'myhorse')) || (item.id === 'profile' && (screen === 'clubhorses' || screen === 'clubhorseedit' || screen === 'clubriders' || screen === 'clubrideredit' || screen === 'clubconfig' || screen === 'clubbadges'));
+          const active = (item.activeOn || [item.id]).includes(screen);
           if (item.special) return (
             <button key={item.id} onClick={() => { setShowLogger(true); setLoggerStep(1); }} className="bg-yellow-300 text-stone-900 rounded-full w-14 h-14 flex items-center justify-center shadow-lg -mt-6">
               <Ic size={28} strokeWidth={3} />
@@ -1120,57 +1142,6 @@ function Ecumanager() {
           ))}
         </div>
 
-        {userType === 'club' ? (
-          <>
-            <h2 className="text-xs font-black text-stone-900 mb-3 uppercase tracking-widest">Administración del club</h2>
-            <div className="space-y-2 mb-5">
-              <button onClick={() => setScreen('clubhorses')} className="w-full bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between hover:border-yellow-300 transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-stone-900 flex items-center justify-center text-xl">🐎</div>
-                  <div className="text-left">
-                    <div className="text-sm font-black uppercase tracking-wider text-stone-900">Gestor de caballos</div>
-                    <div className="text-[10px] font-bold text-stone-500">{clubHorses.filter(h => h.status !== 'baja').length} activos · {clubHorses.filter(h => h.status === 'baja').length} en baja</div>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-stone-400" />
-              </button>
-
-              <button onClick={() => setScreen('clubriders')} className="w-full bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between hover:border-yellow-300 transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-stone-900 flex items-center justify-center text-xl">👥</div>
-                  <div className="text-left">
-                    <div className="text-sm font-black uppercase tracking-wider text-stone-900">Gestor de jinetes</div>
-                    <div className="text-[10px] font-bold text-stone-500">{clubRiders.filter(r => r.status !== 'baja').length} activos · {clubRiders.filter(r => r.status === 'baja').length} en baja</div>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-stone-400" />
-              </button>
-
-              <button onClick={() => setScreen('clubbadges')} className="w-full bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between hover:border-yellow-300 transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-stone-900 flex items-center justify-center text-xl">🏅</div>
-                  <div className="text-left">
-                    <div className="text-sm font-black uppercase tracking-wider text-stone-900">Personalizar insignias</div>
-                    <div className="text-[10px] font-bold text-stone-500">{Object.keys(badgeImages).length} de {badges.filter(b => b.unlocked).length} con foto real</div>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-stone-400" />
-              </button>
-
-              <button onClick={() => setScreen('clubconfig')} className="w-full bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between hover:border-yellow-300 transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-stone-900 flex items-center justify-center text-xl">⚙️</div>
-                  <div className="text-left">
-                    <div className="text-sm font-black uppercase tracking-wider text-stone-900">Configuración del club</div>
-                    <div className="text-[10px] font-bold text-stone-500">Nombre, logo, colores corporativos</div>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-stone-400" />
-              </button>
-            </div>
-          </>
-        ) : null}
-
         <button onClick={exitClub} className="w-full bg-stone-100 text-stone-700 font-black py-3 rounded-2xl flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
           <LogOut size={16} /> Cambiar de sesión
         </button>
@@ -1481,6 +1452,268 @@ function Ecumanager() {
       </>
     );
   };
+
+  // =====================================================================
+  // CLUB · INICIO (dashboard del club)
+  // =====================================================================
+  const ClubHomeScreen = () => {
+    const activeHorses = clubHorses.filter(h => h.status === 'activo');
+    const rehabHorses = clubHorses.filter(h => h.status === 'rehabilitacion');
+    const offHorses = clubHorses.filter(h => h.status === 'baja');
+    const activeRiders = clubRiders.filter(r => r.status === 'activo');
+    const owners = activeRiders.filter(r => r.role === 'propietario');
+    const teachers = activeRiders.filter(r => r.role === 'profesor');
+    const students = activeRiders.filter(r => r.role === 'alumno');
+    const unlockedBadges = badges.filter(b => b.unlocked);
+    const photoBadges = unlockedBadges.filter(b => badgeImages[b.id]).length;
+    const horsesWithPhoto = Object.keys(customImages).length;
+
+    return (
+      <>
+        <Header title={clubConfig.shortName || clubConfig.name || 'Club'} action={
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center" style={{ background: clubConfig.accentColor }}>
+              {clubConfig.logo ? (
+                <img src={clubConfig.logo} alt="logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xl">🏇</span>
+              )}
+            </div>
+          </div>
+        } />
+        <div className="px-5 pt-3 pb-5">
+          {/* Hero */}
+          <div className="rounded-3xl p-5 mb-5 text-white" style={{ background: clubConfig.primaryColor }}>
+            <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: clubConfig.accentColor }}>Panel del club</div>
+            <div className="text-2xl font-black mt-1 leading-tight">Buenas, equipo</div>
+            <div className="text-xs font-bold opacity-70 mt-1">{clubConfig.location || 'Configura la ubicación del club'}</div>
+            <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-white/10">
+              <div>
+                <div className="text-2xl font-black">{activeHorses.length + rehabHorses.length}</div>
+                <div className="text-[9px] font-black uppercase tracking-wider opacity-70">caballos</div>
+              </div>
+              <div>
+                <div className="text-2xl font-black">{activeRiders.length}</div>
+                <div className="text-[9px] font-black uppercase tracking-wider opacity-70">jinetes</div>
+              </div>
+              <div>
+                <div className="text-2xl font-black">{unlockedBadges.length}</div>
+                <div className="text-[9px] font-black uppercase tracking-wider opacity-70">insignias</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Alertas / cosas pendientes */}
+          {(rehabHorses.length > 0 || offHorses.length > 0 || photoBadges < unlockedBadges.length || horsesWithPhoto < activeHorses.length) && (
+            <>
+              <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Atención</h2>
+              <div className="space-y-2 mb-5">
+                {rehabHorses.length > 0 && (
+                  <button onClick={() => setScreen('clubhorses')} className="w-full bg-orange-50 border-2 border-orange-200 rounded-2xl p-3 flex items-center gap-3 text-left">
+                    <div className="text-2xl">🏥</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-black text-stone-900">{rehabHorses.length} caballo{rehabHorses.length > 1 ? 's' : ''} en rehabilitación</div>
+                      <div className="text-[10px] text-stone-600 font-bold truncate">{rehabHorses.map(h => h.name).join(', ')}</div>
+                    </div>
+                    <ChevronRight size={18} className="text-stone-400" />
+                  </button>
+                )}
+                {photoBadges < unlockedBadges.length && (
+                  <button onClick={() => setScreen('clubbadges')} className="w-full bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-3 flex items-center gap-3 text-left">
+                    <div className="text-2xl">📷</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-black text-stone-900">{unlockedBadges.length - photoBadges} insignia{unlockedBadges.length - photoBadges > 1 ? 's' : ''} sin foto del club</div>
+                      <div className="text-[10px] text-stone-600 font-bold">Personalízalas con fotos reales</div>
+                    </div>
+                    <ChevronRight size={18} className="text-stone-400" />
+                  </button>
+                )}
+                {horsesWithPhoto < activeHorses.length && (
+                  <button onClick={() => setScreen('clubhorses')} className="w-full bg-stone-50 border-2 border-stone-200 rounded-2xl p-3 flex items-center gap-3 text-left">
+                    <div className="text-2xl">🐎</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-black text-stone-900">{activeHorses.length - horsesWithPhoto} caballo{activeHorses.length - horsesWithPhoto > 1 ? 's' : ''} sin foto</div>
+                      <div className="text-[10px] text-stone-600 font-bold">Añade fotos para identificarlos mejor</div>
+                    </div>
+                    <ChevronRight size={18} className="text-stone-400" />
+                  </button>
+                )}
+                {offHorses.length > 0 && (
+                  <button onClick={() => setScreen('clubhorses')} className="w-full bg-stone-50 border-2 border-stone-200 rounded-2xl p-3 flex items-center gap-3 text-left opacity-70">
+                    <div className="text-2xl">📦</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-black text-stone-900">{offHorses.length} caballo{offHorses.length > 1 ? 's' : ''} en baja</div>
+                      <div className="text-[10px] text-stone-600 font-bold">Archivados, conservan historial</div>
+                    </div>
+                    <ChevronRight size={18} className="text-stone-400" />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Accesos directos */}
+          <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Accesos directos</h2>
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <button onClick={() => { setEditingHorseId('new'); setScreen('clubhorseedit'); }} className="bg-stone-900 text-white rounded-2xl p-4 text-left">
+              <div className="text-2xl mb-2">🐎</div>
+              <div className="text-xs font-black uppercase tracking-wider">Añadir</div>
+              <div className="text-sm font-black">Caballo</div>
+            </button>
+            <button onClick={() => { setEditingRiderId('new'); setScreen('clubrideredit'); }} className="bg-stone-900 text-white rounded-2xl p-4 text-left">
+              <div className="text-2xl mb-2">👤</div>
+              <div className="text-xs font-black uppercase tracking-wider">Añadir</div>
+              <div className="text-sm font-black">Jinete</div>
+            </button>
+            <button onClick={() => setScreen('clubbadges')} className="bg-yellow-300 text-stone-900 rounded-2xl p-4 text-left">
+              <div className="text-2xl mb-2">🏅</div>
+              <div className="text-xs font-black uppercase tracking-wider">Personalizar</div>
+              <div className="text-sm font-black">Insignias</div>
+            </button>
+            <button onClick={() => setScreen('clubconfig')} className="bg-stone-100 text-stone-900 rounded-2xl p-4 text-left">
+              <div className="text-2xl mb-2">⚙️</div>
+              <div className="text-xs font-black uppercase tracking-wider">Ajustes</div>
+              <div className="text-sm font-black">Del club</div>
+            </button>
+          </div>
+
+          {/* Composición de jinetes */}
+          <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Composición del club</h2>
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 mb-5">
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2"><span>🎒</span><span className="text-sm font-black text-stone-900">Alumnos</span></div>
+                  <span className="text-sm font-black text-stone-900">{students.length}</span>
+                </div>
+                <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-sky-500 rounded-full" style={{ width: `${activeRiders.length > 0 ? (students.length / activeRiders.length) * 100 : 0}%` }} /></div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2"><span>👤</span><span className="text-sm font-black text-stone-900">Propietarios</span></div>
+                  <span className="text-sm font-black text-stone-900">{owners.length}</span>
+                </div>
+                <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full" style={{ width: `${activeRiders.length > 0 ? (owners.length / activeRiders.length) * 100 : 0}%` }} /></div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2"><span>🎓</span><span className="text-sm font-black text-stone-900">Profesores</span></div>
+                  <span className="text-sm font-black text-stone-900">{teachers.length}</span>
+                </div>
+                <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${activeRiders.length > 0 ? (teachers.length / activeRiders.length) * 100 : 0}%` }} /></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Composición de caballos */}
+          <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Tipos de caballo</h2>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: 'Escuela', count: activeHorses.filter(h => h.kind === 'escuela').length, color: 'from-blue-400 to-blue-600', icon: '🎓' },
+              { label: 'Propietario', count: activeHorses.filter(h => h.kind === 'propietario').length, color: 'from-purple-400 to-purple-600', icon: '👤' },
+              { label: 'Mixto', count: activeHorses.filter(h => h.kind === 'mixto').length, color: 'from-amber-400 to-amber-600', icon: '🔀' },
+            ].map(s => (
+              <div key={s.label} className={`bg-gradient-to-br ${s.color} rounded-2xl p-3 text-white`}>
+                <div className="text-xl mb-1">{s.icon}</div>
+                <div className="text-2xl font-black leading-none">{s.count}</div>
+                <div className="text-[9px] font-black uppercase tracking-widest opacity-90 mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // =====================================================================
+  // CLUB · CLASES (placeholder)
+  // =====================================================================
+  const ClubClassesScreen = () => (
+    <>
+      <Header title="Clases" />
+      <div className="px-5 pt-3">
+        <div className="bg-gradient-to-br from-stone-900 to-stone-700 rounded-3xl p-6 text-white mb-5">
+          <div className="text-[10px] font-black text-yellow-300 uppercase tracking-widest">Próximamente</div>
+          <div className="text-2xl font-black mt-1">Gestor de clases</div>
+          <div className="text-xs text-stone-300 font-bold mt-2 leading-relaxed">
+            Programa clases, asigna jinetes y caballos, define objetivos y registra valoraciones. Los jinetes verán su próxima clase en su app.
+          </div>
+        </div>
+
+        <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Qué podrás hacer</h2>
+        <div className="space-y-2 mb-5">
+          {[
+            { icon: '📅', title: 'Crear clases', desc: 'Día, hora, duración, profesor' },
+            { icon: '🎯', title: 'Definir objetivos', desc: 'Qué se va a trabajar en cada sesión' },
+            { icon: '🐎', title: 'Asignar caballo', desc: 'Cada jinete con su montura' },
+            { icon: '📝', title: 'Registrar valoración', desc: 'Feedback del profesor tras la clase' },
+            { icon: '📊', title: 'Histórico', desc: 'Ver clases pasadas por jinete o caballo' },
+          ].map((item, i) => (
+            <div key={i} className="bg-white border border-stone-200 rounded-2xl p-3 flex items-center gap-3 opacity-60">
+              <div className="text-2xl">{item.icon}</div>
+              <div className="flex-1">
+                <div className="text-sm font-black text-stone-900">{item.title}</div>
+                <div className="text-[10px] text-stone-500 font-bold">{item.desc}</div>
+              </div>
+              <Lock size={14} className="text-stone-400" />
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 flex gap-2">
+          <div className="text-lg">💡</div>
+          <div className="text-xs text-stone-700 leading-relaxed">
+            Este módulo aún no está activo en el prototipo. Pídeselo a tu desarrollador cuando quieras desbloquearlo.
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  // =====================================================================
+  // CLUB · MÁS (menú con accesos secundarios)
+  // =====================================================================
+  const ClubMoreScreen = () => (
+    <>
+      <Header title="Más" />
+      <div className="px-5 pt-3">
+        <div className="space-y-2 mb-5">
+          <button onClick={() => setScreen('clubbadges')} className="w-full bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-stone-900 flex items-center justify-center text-xl">🏅</div>
+              <div className="text-left">
+                <div className="text-sm font-black uppercase tracking-wider text-stone-900">Insignias</div>
+                <div className="text-[10px] font-bold text-stone-500">Personaliza el catálogo del club</div>
+              </div>
+            </div>
+            <ChevronRight size={20} className="text-stone-400" />
+          </button>
+
+          <button onClick={() => setScreen('clubconfig')} className="w-full bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-stone-900 flex items-center justify-center text-xl">⚙️</div>
+              <div className="text-left">
+                <div className="text-sm font-black uppercase tracking-wider text-stone-900">Configuración</div>
+                <div className="text-[10px] font-bold text-stone-500">Nombre, logo, colores, datos</div>
+              </div>
+            </div>
+            <ChevronRight size={20} className="text-stone-400" />
+          </button>
+        </div>
+
+        <h2 className="text-xs font-black text-stone-900 uppercase mb-3 tracking-widest">Información</h2>
+        <div className="bg-stone-50 rounded-2xl p-4 mb-5">
+          <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-2">Código de club</div>
+          <div className="font-mono text-sm font-black text-stone-900 mb-2">#{clubCode}</div>
+          <div className="text-[10px] text-stone-600 leading-relaxed">Comparte este código con los jinetes para que vean los datos del club desde su app.</div>
+        </div>
+
+        <button onClick={exitClub} className="w-full bg-stone-100 text-stone-700 font-black py-3 rounded-2xl flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+          <LogOut size={16} /> Cambiar de sesión
+        </button>
+      </div>
+    </>
+  );
 
   const LoggerModal = () => (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowLogger(false)}>
@@ -2051,26 +2284,32 @@ function Ecumanager() {
   };
 
   const renderScreen = () => {
-    // Pantallas admin solo accesibles para userType === 'club'
-    const adminScreens = ['clubhorses','clubhorseedit','clubriders','clubrideredit','clubconfig','clubbadges'];
-    if (adminScreens.includes(screen) && userType !== 'club') {
-      return <ProfileScreen />;
-    }
-    if (screen === 'home') return <HomeScreen />;
-    if (screen === 'badges') return <BadgesScreen />;
+    // Pantallas solo para club
+    const clubOnly = ['clubhome','clubhorses','clubhorseedit','clubriders','clubrideredit','clubconfig','clubbadges','clubclasses','clubmore'];
+    // Pantallas solo para jinete
+    const riderOnly = ['horse','myhorse','next','badge'];
+
+    if (clubOnly.includes(screen) && userType !== 'club') return <HomeScreen />;
+    if (riderOnly.includes(screen) && userType === 'club') return <ClubHomeScreen />;
+
+    if (screen === 'home') return userType === 'club' ? <ClubHomeScreen /> : <HomeScreen />;
+    if (screen === 'badges') return userType === 'club' ? <ClubBadgesScreen /> : <BadgesScreen />;
     if (screen === 'badge') return <BadgeDetailScreen />;
-    if (screen === 'horses') return <HorsesScreen />;
+    if (screen === 'horses') return userType === 'club' ? <ClubHorsesScreen /> : <HorsesScreen />;
     if (screen === 'horse') return <HorseDetailScreen />;
     if (screen === 'myhorse') return <MyHorseScreen />;
     if (screen === 'next') return <NextClassScreen />;
-    if (screen === 'profile') return <ProfileScreen />;
+    if (screen === 'profile') return userType === 'club' ? <ClubMoreScreen /> : <ProfileScreen />;
+    if (screen === 'clubhome') return <ClubHomeScreen />;
     if (screen === 'clubhorses') return <ClubHorsesScreen />;
     if (screen === 'clubhorseedit') return <ClubHorseEditScreen />;
     if (screen === 'clubriders') return <ClubRidersScreen />;
     if (screen === 'clubrideredit') return <ClubRiderEditScreen />;
     if (screen === 'clubconfig') return <ClubConfigScreen />;
     if (screen === 'clubbadges') return <ClubBadgesScreen />;
-    return <HomeScreen />;
+    if (screen === 'clubclasses') return <ClubClassesScreen />;
+    if (screen === 'clubmore') return <ClubMoreScreen />;
+    return userType === 'club' ? <ClubHomeScreen /> : <HomeScreen />;
   };
 
   // === Pantalla de entrada: elegir tipo + código de club ===
