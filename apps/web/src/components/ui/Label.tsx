@@ -1,4 +1,4 @@
-import { type LabelHTMLAttributes } from 'react';
+import { type LabelHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export function Label({
@@ -16,22 +16,32 @@ export function Label({
   );
 }
 
+/**
+ * Wrapper de campo: envuelve el input en un `<label>` HTML para que el
+ * click en el texto enfoque el input y la accesibilidad asocie ambos
+ * automáticamente. Esto también permite que herramientas como bro
+ * encuentren el input por su label visible.
+ */
 export function Field({
   label,
   children,
   hint,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
   hint?: string;
 }) {
   return (
-    <div className="block">
-      <Label>{label}</Label>
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.16em] text-stone-600">
+        {label}
+      </span>
       {children}
       {hint && (
-        <p className="mt-1 text-[11px] font-medium text-stone-500">{hint}</p>
+        <span className="mt-1 block text-[11px] font-medium text-stone-500">
+          {hint}
+        </span>
       )}
-    </div>
+    </label>
   );
 }
