@@ -7,6 +7,9 @@ const config: NextConfig = {
     '@equmanager/database',
     '@equmanager/domain',
   ],
+  experimental: {
+    typedRoutes: true,
+  },
   images: {
     remotePatterns: [
       {

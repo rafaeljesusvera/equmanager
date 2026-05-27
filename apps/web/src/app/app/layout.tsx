@@ -1,15 +1,15 @@
 import { getCurrentUser } from '@equmanager/auth';
-import { Home, Users, MessageSquareDashed, Sparkles, LogOut } from 'lucide-react';
+import { Home, Users, Sparkles, LogOut, type LucideIcon } from 'lucide-react';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { signOut } from '../auth/actions';
 
-const nav = [
+const nav: { href: Route; label: string; icon: LucideIcon }[] = [
   { href: '/app', label: 'Inicio', icon: Home },
   { href: '/app/horses', label: 'Caballos', icon: Sparkles },
   { href: '/app/riders', label: 'Jinetes', icon: Users },
-  { href: '/app/lessons', label: 'Clases', icon: MessageSquareDashed },
-] as const;
+];
 
 export default async function AppLayout({
   children,

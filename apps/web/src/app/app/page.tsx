@@ -1,6 +1,7 @@
 import { db, schema } from '@equmanager/database';
 import { getCurrentUser } from '@equmanager/auth';
 import { eq, sql } from 'drizzle-orm';
+import type { Route } from 'next';
 import Link from 'next/link';
 
 export const metadata = { title: 'Inicio' };
@@ -74,7 +75,6 @@ export default async function AppHome() {
           <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
             <Kpi label="Caballos" value={stats.counts!.horses} href="/app/horses" />
             <Kpi label="Jinetes" value={stats.counts!.riders} href="/app/riders" />
-            <Kpi label="Clases" value={stats.counts!.lessons} href="/app/lessons" />
           </section>
 
           <section>
@@ -110,7 +110,7 @@ function Kpi({
 }: {
   label: string;
   value: number;
-  href: string;
+  href: Route;
 }) {
   return (
     <Link
