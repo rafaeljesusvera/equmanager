@@ -12,6 +12,7 @@ import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
 import { Button, Field, Select } from '@/components/ui';
 import { Input } from '@/components/ui/Input';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { BadgeCard } from '@/components/badge/BadgeCard';
 import { BadgeLiveEditor } from '@/components/badge/BadgeLiveEditor';
 import { formatDate } from '@/lib/format';
@@ -198,17 +199,13 @@ export default async function BadgeDetailPage({
                     </div>
                   </div>
                 </div>
-                <form action={revokeBadgeAction}>
-                  <input type="hidden" name="id" value={a.id} />
-                  <input type="hidden" name="badgeId" value={badge.id} />
-                  <button
-                    type="submit"
-                    className="rounded-lg p-1.5 text-stone-400 transition hover:bg-red-50 hover:text-red-600"
-                    title="Retirar insignia"
-                  >
-                    <XIcon size={14} weight="bold" />
-                  </button>
-                </form>
+                <ConfirmDeleteButton
+                  action={revokeBadgeAction}
+                  hidden={{ id: a.id, badgeId: badge.id }}
+                  title="Retirar insignia"
+                  description={`¿Quieres retirar la insignia "${badge.name}" a ${a.riderName}?`}
+                  confirmLabel="Sí, retirar"
+                />
               </div>
             ))}
           </div>
@@ -238,12 +235,14 @@ export default async function BadgeDetailPage({
         title="Zona peligrosa"
         description="Eliminar la insignia retira automáticamente todas las entregas."
       >
-        <form action={deleteBadgeAction}>
-          <input type="hidden" name="id" value={badge.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar insignia
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteBadgeAction}
+          hidden={{ id: badge.id }}
+          triggerLabel="Eliminar insignia"
+          title={`Eliminar "${badge.name}"`}
+          description={`Se retirará a ${awarded.length} alumno${awarded.length === 1 ? '' : 's'} y no se puede deshacer.`}
+        />
       </DetailSection>
     </DetailShell>
   );

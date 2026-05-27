@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   CheckCircleIcon,
@@ -22,22 +22,66 @@ export function showToast(kind: ToastKind, text: string) {
   if (listener) listener({ id: Date.now() + Math.random(), kind, text });
 }
 
+const SAVING_FAILSAFE_MS = 6000;
+const FINAL_TOAST_MS = 1800;
+
 export function ToastHost() {
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<ToastMessage[]>([]);
+  const savingTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const finalTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   useEffect(() => {
     setMounted(true);
     listener = (t) => {
-      setItems((prev) => [...prev, t]);
-      if (t.kind !== 'saving') {
-        setTimeout(() => {
+      if (t.kind === 'saving') {
+        // Mantén un solo "guardando" a la vez: reemplaza el anterior.
+        setItems((prev) => {
+          prev
+            .filter((x) => x.kind === 'saving')
+            .forEach((x) => {
+              const timer = savingTimers.current.get(x.id);
+              if (timer) clearTimeout(timer);
+              savingTimers.current.delete(x.id);
+            });
+          return [...prev.filter((x) => x.kind !== 'saving'), t];
+        });
+        // Failsafe: si nadie cierra el "guardando", lo quitamos solos.
+        const failsafe = setTimeout(() => {
           setItems((prev) => prev.filter((x) => x.id !== t.id));
-        }, 2200);
+          savingTimers.current.delete(t.id);
+        }, SAVING_FAILSAFE_MS);
+        savingTimers.current.set(t.id, failsafe);
+        return;
       }
+
+      // Para success/error: limpia los "guardando" pendientes y añade el final.
+      setItems((prev) => {
+        prev
+          .filter((x) => x.kind === 'saving')
+          .forEach((x) => {
+            const timer = savingTimers.current.get(x.id);
+            if (timer) clearTimeout(timer);
+            savingTimers.current.delete(x.id);
+          });
+        return [...prev.filter((x) => x.kind !== 'saving'), t];
+      });
+      const off = setTimeout(() => {
+        setItems((prev) => prev.filter((x) => x.id !== t.id));
+        finalTimers.current.delete(t.id);
+      }, FINAL_TOAST_MS);
+      finalTimers.current.set(t.id, off);
     };
     return () => {
       listener = null;
+      savingTimers.current.forEach((t) => clearTimeout(t));
+      finalTimers.current.forEach((t) => clearTimeout(t));
+      savingTimers.current.clear();
+      finalTimers.current.clear();
     };
   }, []);
 

@@ -6,15 +6,22 @@ import {
   CalendarBlankIcon,
   MedalIcon,
   TicketIcon,
+  EyeIcon,
+  WarningCircleIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { RIDER_CATEGORIES, RIDER_TIERS } from '@equmanager/domain';
 import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
 import { Badge, Button, Field, Input, Select, Textarea } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { formatDate, formatDateTime } from '@/lib/format';
-import { deleteRiderAction, updateRiderAction } from '../actions';
+import {
+  deleteRiderAction,
+  impersonateRiderAction,
+  updateRiderAction,
+} from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,12 +41,15 @@ export async function generateMetadata({
 
 export default async function RiderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const session = await ensureSession();
   assertRole(session, ['owner', 'admin', 'instructor']);
   const { id } = await params;
+  const { error: errorMsg } = await searchParams;
 
   const [rider] = await db
     .select()
@@ -108,6 +118,31 @@ export default async function RiderDetailPage({
         tone: rider.status === 'activo' ? 'success' : 'neutral',
       }}
     >
+      {errorMsg && (
+        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900">
+          <WarningCircleIcon size={16} weight="fill" />
+          {errorMsg}
+        </div>
+      )}
+
+      <DetailSection
+        title="Acciones rápidas"
+        description="Para ver Equmanager exactamente como lo ve este alumno sin compartir contraseñas."
+      >
+        {rider.profileId ? (
+          <form action={impersonateRiderAction}>
+            <input type="hidden" name="id" value={rider.id} />
+            <Button type="submit" variant="outline">
+              <EyeIcon size={14} weight="bold" /> Ver Equmanager como {rider.name}
+            </Button>
+          </form>
+        ) : (
+          <p className="text-sm font-medium text-stone-500">
+            Este alumno aún no se ha registrado con su email en Equmanager. En
+            cuanto lo haga, podrás verlo como él para asistirle.
+          </p>
+        )}
+      </DetailSection>
       <DetailSection
         title="Datos generales"
         description="Se guarda solo al salir de cada campo."
@@ -286,12 +321,14 @@ export default async function RiderDetailPage({
         title="Zona peligrosa"
         description="Estas acciones no se pueden deshacer."
       >
-        <form action={deleteRiderAction}>
-          <input type="hidden" name="id" value={rider.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar alumno
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteRiderAction}
+          hidden={{ id: rider.id }}
+          triggerLabel="Eliminar alumno"
+          title={`Eliminar a ${rider.name}`}
+          description="Se eliminarán sus inscripciones, asistencias e insignias. No se puede deshacer."
+        />
       </DetailSection>
     </DetailShell>
   );

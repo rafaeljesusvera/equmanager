@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { ToastHost } from '@/components/ui/Toast';
+import { NavProgress } from '@/components/shell/NavProgress';
 
 export const metadata: Metadata = {
   title: {
@@ -20,6 +22,9 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className="min-h-screen bg-stone-50 font-sans text-stone-900">
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         {children}
         <ToastHost />
       </body>

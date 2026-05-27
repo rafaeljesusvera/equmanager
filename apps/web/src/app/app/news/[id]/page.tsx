@@ -6,6 +6,7 @@ import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
 import { Button, Field, Input, Textarea } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { formatDate } from '@/lib/format';
 import { deleteNewsAction, updateNewsAction } from '../actions';
@@ -99,12 +100,14 @@ export default async function NewsDetailPage({
         title="Zona peligrosa"
         description="Eliminar una noticia es definitivo."
       >
-        <form action={deleteNewsAction}>
-          <input type="hidden" name="id" value={news.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar noticia
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteNewsAction}
+          hidden={{ id: news.id }}
+          triggerLabel="Eliminar noticia"
+          title={`Eliminar "${news.title}"`}
+          description="Esta acción no se puede deshacer."
+        />
       </DetailSection>
     </DetailShell>
   );

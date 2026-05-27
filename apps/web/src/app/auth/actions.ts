@@ -2,6 +2,10 @@
 
 import { createAdminClient, createServerClient } from '@equmanager/auth';
 import { redirect } from 'next/navigation';
+import {
+  clearImpersonationFlag,
+  getImpersonationFrom,
+} from '@/lib/impersonation';
 
 export async function signInWithPassword(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim();
@@ -63,5 +67,41 @@ export async function signUpWithPassword(formData: FormData) {
 export async function signOut() {
   const supabase = await createServerClient();
   await supabase.auth.signOut();
+  await clearImpersonationFlag();
   redirect('/login');
+}
+
+/**
+ * Vuelve a la cuenta original del que inició la impersonación. Lee el
+ * email guardado en la cookie, genera un magic link admin para esa
+ * cuenta y verifica el OTP para reestablecer la sesión original.
+ */
+export async function stopImpersonatingAction() {
+  const originalEmail = await getImpersonationFrom();
+  if (!originalEmail) redirect('/app');
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: originalEmail,
+  });
+  if (error || !data?.properties?.hashed_token) {
+    await clearImpersonationFlag();
+    redirect(
+      `/login?error=${encodeURIComponent(error?.message ?? 'No se pudo restaurar tu cuenta.')}`,
+    );
+  }
+
+  const supabase = await createServerClient();
+  await supabase.auth.signOut();
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    token_hash: data.properties.hashed_token,
+    type: 'magiclink',
+  });
+  await clearImpersonationFlag();
+  if (verifyError) {
+    redirect(`/login?error=${encodeURIComponent(verifyError.message)}`);
+  }
+
+  redirect('/app');
 }

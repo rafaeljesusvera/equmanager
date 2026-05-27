@@ -22,6 +22,7 @@ import {
   Badge,
 } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { formatDate, formatDateTime } from '@/lib/format';
 import {
@@ -232,17 +233,13 @@ export default async function HorseDetailPage({
                   <Badge tone={o.role === 'owner' ? 'brand' : 'neutral'}>
                     {o.role}
                   </Badge>
-                  <form action={removeHorseOwnerAction}>
-                    <input type="hidden" name="id" value={o.id} />
-                    <input type="hidden" name="horseId" value={horse.id} />
-                    <button
-                      type="submit"
-                      className="rounded-lg p-1.5 text-stone-400 transition hover:bg-red-50 hover:text-red-600"
-                      title="Quitar"
-                    >
-                      <XIcon size={14} weight="bold" />
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    action={removeHorseOwnerAction}
+                    hidden={{ id: o.id, horseId: horse.id }}
+                    title="Quitar propietario"
+                    description={`¿Quieres quitar a ${o.name ?? o.email} como propietario de ${horse.name}?`}
+                    confirmLabel="Sí, quitar"
+                  />
                 </div>
               </div>
             ))}
@@ -419,12 +416,14 @@ export default async function HorseDetailPage({
         title="Zona peligrosa"
         description="Estas acciones no se pueden deshacer."
       >
-        <form action={deleteHorseAction}>
-          <input type="hidden" name="id" value={horse.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar caballo
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteHorseAction}
+          hidden={{ id: horse.id }}
+          triggerLabel="Eliminar caballo"
+          title={`Eliminar a ${horse.name}`}
+          description="Se eliminarán también sus cuidados, historial de montura y opiniones."
+        />
       </DetailSection>
     </DetailShell>
   );

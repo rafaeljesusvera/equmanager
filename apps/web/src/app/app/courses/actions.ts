@@ -154,3 +154,114 @@ export async function deleteCourseSessionAction(formData: FormData) {
   await db.delete(schema.courseSessions).where(eq(schema.courseSessions.id, id));
   revalidatePath(`/app/courses/${courseId}`);
 }
+
+/**
+ * Genera automáticamente las sesiones del curso entre dos fechas, en los
+ * días de la semana indicados y a la hora marcada.
+ *
+ * formData:
+ *  - courseId
+ *  - startDate (YYYY-MM-DD)
+ *  - endDate (YYYY-MM-DD)
+ *  - time (HH:MM)
+ *  - duration (minutos)
+ *  - weekdays (varias entradas con value 0..6, 0 = domingo)
+ *  - mode = 'replace' | 'append'
+ */
+export async function generateCourseSessionsAction(formData: FormData) {
+  const session = await assertStaff();
+  const courseId = String(formData.get('courseId'));
+  const startStr = String(formData.get('startDate') ?? '');
+  const endStr = String(formData.get('endDate') ?? '');
+  const time = String(formData.get('time') ?? '10:00');
+  const duration = Math.max(15, Number(formData.get('duration')) || 60);
+  const mode = String(formData.get('mode') ?? 'append');
+  const weekdays = formData
+    .getAll('weekdays')
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+
+  if (!courseId || !startStr || !endStr || weekdays.length === 0) {
+    redirect(
+      `/app/courses/${courseId}?error=${encodeURIComponent('Faltan fechas o días de la semana.')}`,
+    );
+  }
+
+  // Verifica que el curso pertenece al club
+  const [course] = await db
+    .select()
+    .from(schema.courses)
+    .where(
+      and(
+        eq(schema.courses.id, courseId),
+        eq(schema.courses.clubId, session.primary.clubId),
+      ),
+    )
+    .limit(1);
+  if (!course) redirect('/app/courses');
+
+  const start = new Date(`${startStr}T00:00:00`);
+  const end = new Date(`${endStr}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    redirect(
+      `/app/courses/${courseId}?error=${encodeURIComponent('Rango de fechas inválido.')}`,
+    );
+  }
+  const [h, m] = time.split(':').map((n) => Number(n));
+  if (!Number.isInteger(h) || !Number.isInteger(m)) {
+    redirect(
+      `/app/courses/${courseId}?error=${encodeURIComponent('Hora inválida.')}`,
+    );
+  }
+
+  // Si modo replace, borra todas las sesiones previas del curso
+  if (mode === 'replace') {
+    await db
+      .delete(schema.courseSessions)
+      .where(eq(schema.courseSessions.courseId, courseId));
+  }
+
+  const sessionsToInsert: Array<{
+    courseId: string;
+    date: Date;
+    durationMinutes: number;
+  }> = [];
+
+  // Itera día a día
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (weekdays.includes(cursor.getDay())) {
+      const date = new Date(cursor);
+      date.setHours(h!, m!, 0, 0);
+      sessionsToInsert.push({
+        courseId,
+        date,
+        durationMinutes: duration,
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  if (sessionsToInsert.length > 0) {
+    await db.insert(schema.courseSessions).values(sessionsToInsert);
+  }
+
+  // Actualiza las fechas del curso si extiende el rango
+  await db
+    .update(schema.courses)
+    .set({
+      startDate: course.startDate
+        ? new Date(Math.min(new Date(course.startDate).getTime(), start.getTime()))
+        : start,
+      endDate: course.endDate
+        ? new Date(Math.max(new Date(course.endDate).getTime(), end.getTime()))
+        : end,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.courses.id, courseId));
+
+  revalidatePath(`/app/courses/${courseId}`);
+  redirect(
+    `/app/courses/${courseId}?generated=${sessionsToInsert.length}`,
+  );
+}

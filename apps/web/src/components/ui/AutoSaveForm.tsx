@@ -16,7 +16,9 @@ type Action = (formData: FormData) => Promise<void> | void;
  * Form de edición con auto-guardado al perder foco.
  * - Detecta blur en inputs/selects/textareas hijos.
  * - Si el valor cambió desde el último guardado, dispara la action.
- * - Muestra toast "Guardando…" → "Guardado ✓".
+ * - Muestra toast "Guardando…" (singleton) → "Guardado".
+ * - Si varios blurs caen seguidos, sólo se ejecuta el último (debounce 200ms)
+ *   y nunca dos guardados en paralelo (cola interna).
  */
 export function AutoSaveForm({
   action,
@@ -31,53 +33,86 @@ export function AutoSaveForm({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const lastSerialized = useRef<string>('');
-  const [pending, start] = useTransition();
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlight = useRef(false);
+  const pendingDirty = useRef(false);
+  const [, start] = useTransition();
 
-  // Serializa el form actual para detectar cambios
   const serialize = useCallback((): string => {
     if (!formRef.current) return '';
     const fd = new FormData(formRef.current);
     const parts: string[] = [];
-    fd.forEach((v, k) => parts.push(`${k}=${typeof v === 'string' ? v : '[file]'}`));
+    fd.forEach((v, k) =>
+      parts.push(`${k}=${typeof v === 'string' ? v : '[file]'}`),
+    );
     return parts.sort().join('&');
   }, []);
 
-  // Snapshot inicial cuando se monta
   useEffect(() => {
     lastSerialized.current = serialize();
   }, [serialize]);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    triggerSave();
-  }
-
-  function triggerSave() {
+  const runSave = useCallback(async () => {
     if (!formRef.current) return;
     const current = serialize();
     if (current === lastSerialized.current) return;
+    if (inFlight.current) {
+      pendingDirty.current = true;
+      return;
+    }
+    inFlight.current = true;
     const fd = new FormData(formRef.current);
     lastSerialized.current = current;
     if (!silent) showToast('saving', 'Guardando…');
-    start(async () => {
-      try {
-        await action(fd);
-        if (!silent) showToast('success', 'Guardado');
-      } catch (err) {
-        showToast(
-          'error',
-          err instanceof Error ? err.message : 'Error al guardar',
-        );
+    try {
+      await new Promise<void>((resolve, reject) => {
+        start(async () => {
+          try {
+            await action(fd);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      });
+      if (!silent) showToast('success', 'Guardado');
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      inFlight.current = false;
+      if (pendingDirty.current) {
+        pendingDirty.current = false;
+        // Reintentamos por si quedaron cambios sin guardar
+        void runSave();
       }
-    });
+    }
+  }, [action, serialize, silent, start]);
+
+  function scheduleSave() {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      void runSave();
+    }, 200);
+  }
+
+  useEffect(
+    () => () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    },
+    [],
+  );
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    void runSave();
   }
 
   function handleBlur(e: React.FocusEvent<HTMLFormElement>) {
     const target = e.target as HTMLElement;
     const tag = target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
-      // Pequeño defer para que el cambio de value llegue al state del input
-      setTimeout(triggerSave, 0);
+      scheduleSave();
     }
   }
 
@@ -87,7 +122,6 @@ export function AutoSaveForm({
       onSubmit={handleSubmit}
       onBlur={handleBlur}
       className={className}
-      data-pending={pending ? 'true' : 'false'}
     >
       {children}
     </form>

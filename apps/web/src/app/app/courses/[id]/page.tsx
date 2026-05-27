@@ -12,7 +12,9 @@ import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
 import { Button, Field, Input, Select, Textarea } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
+import { SessionGenerator } from '@/components/course/SessionGenerator';
 import { formatCents, formatDateTime, toDatetimeLocal } from '@/lib/format';
 import {
   addCourseSessionAction,
@@ -39,12 +41,15 @@ export async function generateMetadata({
 
 export default async function CourseDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ generated?: string; error?: string }>;
 }) {
   const session = await ensureSession();
   assertRole(session, ['owner', 'admin', 'instructor']);
   const { id } = await params;
+  const { generated, error: errMsg } = await searchParams;
 
   const [course] = await db
     .select()
@@ -185,10 +190,39 @@ export default async function CourseDetailPage({
         </AutoSaveForm>
       </DetailSection>
 
+      {generated && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
+          ✓ {generated} sesion{Number(generated) === 1 ? '' : 'es'} generada
+          {Number(generated) === 1 ? '' : 's'} automáticamente.
+        </div>
+      )}
+      {errMsg && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900">
+          {errMsg}
+        </div>
+      )}
+
       <DetailSection
         title="Sesiones"
-        description="Cada sesión es una clase concreta del curso."
+        description={`${sessions.length} programada${sessions.length === 1 ? '' : 's'}. Genera por días de la semana o añade una a una.`}
       >
+        <div className="mb-5">
+          <SessionGenerator
+            courseId={course.id}
+            defaultStart={
+              course.startDate
+                ? new Date(course.startDate).toISOString().slice(0, 10)
+                : undefined
+            }
+            defaultEnd={
+              course.endDate
+                ? new Date(course.endDate).toISOString().slice(0, 10)
+                : undefined
+            }
+            hasExistingSessions={sessions.length > 0}
+          />
+        </div>
+
         {sessions.length > 0 && (
           <div className="mb-4 space-y-2">
             {sessions.map((s) => (
@@ -211,16 +245,12 @@ export default async function CourseDetailPage({
                     </div>
                   </div>
                 </div>
-                <form action={deleteCourseSessionAction}>
-                  <input type="hidden" name="id" value={s.id} />
-                  <input type="hidden" name="courseId" value={course.id} />
-                  <button
-                    type="submit"
-                    className="rounded-lg p-1.5 text-stone-400 transition hover:bg-red-50 hover:text-red-600"
-                  >
-                    <TrashIcon size={14} weight="bold" />
-                  </button>
-                </form>
+                <ConfirmDeleteButton
+                  action={deleteCourseSessionAction}
+                  hidden={{ id: s.id, courseId: course.id }}
+                  title="Eliminar sesión"
+                  description={`¿Quieres eliminar la sesión del ${formatDateTime(s.date)}? No se puede deshacer.`}
+                />
               </div>
             ))}
           </div>
@@ -303,12 +333,14 @@ export default async function CourseDetailPage({
         title="Zona peligrosa"
         description="Eliminar un curso elimina también sus sesiones."
       >
-        <form action={deleteCourseAction}>
-          <input type="hidden" name="id" value={course.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar curso
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteCourseAction}
+          hidden={{ id: course.id }}
+          triggerLabel="Eliminar curso"
+          title={`Eliminar "${course.title}"`}
+          description="Se eliminarán todas las sesiones programadas y los datos del curso. Las inscripciones quedarán huérfanas."
+        />
       </DetailSection>
     </DetailShell>
   );

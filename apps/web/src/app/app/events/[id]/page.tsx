@@ -10,6 +10,7 @@ import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
 import { Button, Field, Input, Select, Textarea } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { formatDateTime, toDatetimeLocal } from '@/lib/format';
 import { deleteEventAction, updateEventAction } from '../actions';
@@ -206,12 +207,14 @@ export default async function EventDetailPage({
         title="Zona peligrosa"
         description="Elimina el evento si ya no aplica."
       >
-        <form action={deleteEventAction}>
-          <input type="hidden" name="id" value={event.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar evento
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteEventAction}
+          hidden={{ id: event.id }}
+          triggerLabel="Eliminar evento"
+          title={`Eliminar "${event.title}"`}
+          description="Las inscripciones de los alumnos quedarán huérfanas."
+        />
       </DetailSection>
     </DetailShell>
   );

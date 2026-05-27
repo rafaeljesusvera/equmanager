@@ -9,6 +9,7 @@ import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
 import { Badge, Button, Field, Input, Textarea } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
+import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { formatCents, formatDate } from '@/lib/format';
 import { deleteBonoAction, updateBonoAction } from '../actions';
@@ -186,12 +187,14 @@ export default async function BonoDetailPage({
         title="Zona peligrosa"
         description="Eliminar un bono no elimina las compras pasadas."
       >
-        <form action={deleteBonoAction}>
-          <input type="hidden" name="id" value={bono.id} />
-          <Button type="submit" variant="danger">
-            <TrashIcon size={14} weight="bold" /> Eliminar bono
-          </Button>
-        </form>
+        <ConfirmDeleteButton
+          variant="button"
+          action={deleteBonoAction}
+          hidden={{ id: bono.id }}
+          triggerLabel="Eliminar bono"
+          title={`Eliminar "${bono.name}"`}
+          description="Las compras de los alumnos quedarán en su historial pero ya no se podrá comprar de nuevo."
+        />
       </DetailSection>
     </DetailShell>
   );
