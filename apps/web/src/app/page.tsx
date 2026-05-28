@@ -8,14 +8,17 @@ import {
   CalendarBlankIcon,
   ArrowRightIcon,
 } from '@phosphor-icons/react/dist/ssr';
-import { LogoFull } from '@/components/brand/Logo';
+import { LogoFull, LogoMark } from '@/components/brand/Logo';
 
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-brand-50 via-stone-50 to-stone-50">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <LogoFull className="h-10 w-auto" />
-        <nav className="flex items-center gap-3">
+      <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-5 md:px-6 md:py-6">
+        <Link href="/" className="flex items-center gap-2" aria-label="Equmanager">
+          <LogoMark size={40} className="md:hidden" />
+          <LogoFull className="hidden h-12 w-auto md:block" />
+        </Link>
+        <nav className="flex items-center gap-2 md:gap-3">
           <Link
             href="/help/como-empezar"
             className="hidden text-xs font-bold uppercase tracking-[0.18em] text-stone-600 hover:text-brand-700 md:block"
@@ -24,13 +27,13 @@ export default function HomePage() {
           </Link>
           <Link
             href="/login"
-            className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] text-stone-800 transition hover:border-brand-400 hover:text-brand-700"
+            className="whitespace-nowrap rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-stone-800 transition hover:border-brand-400 hover:text-brand-700 md:px-4 md:text-xs md:tracking-[0.18em]"
           >
             Entrar
           </Link>
           <Link
             href="/signup"
-            className="rounded-xl bg-brand-700 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] text-white shadow-card transition hover:bg-brand-600"
+            className="whitespace-nowrap rounded-xl bg-brand-700 px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-card transition hover:bg-brand-600 md:px-4 md:text-xs md:tracking-[0.18em]"
           >
             Crear cuenta
           </Link>
