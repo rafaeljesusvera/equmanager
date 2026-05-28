@@ -42,6 +42,12 @@ const PATTERN_TITLES: Array<[RegExp, string]> = [
   [/^\/app\/ai\/[^/]+$/, 'Nota IA'],
   [/^\/app\/horse-owner\/[^/]+$/, 'Caballo'],
   [/^\/app\/groom\/[^/]+$/, 'Checklist'],
+  [/^\/app\/me\/lessons\/[^/]+$/, 'Mi clase'],
+  [/^\/app\/me\/horses\/[^/]+$/, 'Mi caballo'],
+  [/^\/app\/me\/events\/[^/]+$/, 'Evento'],
+  [/^\/app\/me\/bonos\/[^/]+$/, 'Mi bono'],
+  [/^\/app\/me\/badges\/[^/]+$/, 'Insignia'],
+  [/^\/app\/me\/badges\/locked\/[^/]+$/, 'Insignia bloqueada'],
 ];
 
 function titleFor(path: string): string {
