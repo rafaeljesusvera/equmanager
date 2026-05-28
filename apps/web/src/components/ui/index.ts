@@ -1,3 +1,4 @@
+export { Avatar, AvatarStack } from './Avatar';
 export { Button } from './Button';
 export {
   Card,

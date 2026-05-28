@@ -10,16 +10,14 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
-          {eyebrow}
-        </p>
-        <h1 className="mt-1 text-3xl font-bold text-stone-900 md:text-4xl">
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-4 md:mb-10">
+      <div className="min-w-0">
+        <p className="label-eyebrow">{eyebrow}</p>
+        <h1 className="mt-2 font-display text-4xl font-normal leading-[1] tracking-tightest text-stone-900 md:text-6xl">
           {title}
         </h1>
         {description && (
-          <p className="mt-1.5 max-w-xl text-sm font-medium text-stone-500">
+          <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-stone-500 md:text-base">
             {description}
           </p>
         )}

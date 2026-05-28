@@ -8,11 +8,12 @@ import {
   ChatCircleTextIcon,
   TrophyIcon,
   ArrowRightIcon,
+  TicketIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, assertRole } from '@/lib/db';
 import { ensureRiderForProfile } from '@/lib/db/rider';
-import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, EmptyState } from '@/components/ui';
+import { Avatar, AvatarStack, Badge, EmptyState } from '@/components/ui';
+import { BadgeCard } from '@/components/badge/BadgeCard';
 import { formatDateTime } from '@/lib/format';
 
 export const metadata = { title: 'Mi panel' };
@@ -38,6 +39,7 @@ export default async function MePage() {
       date: schema.lessons.date,
       discipline: schema.lessons.discipline,
       horseName: schema.horses.name,
+      horsePhoto: schema.horses.photoUrl,
     })
     .from(schema.lessonAttendees)
     .innerJoin(schema.lessons, eq(schema.lessons.id, schema.lessonAttendees.lessonId))
@@ -49,7 +51,7 @@ export default async function MePage() {
       ),
     )
     .orderBy(schema.lessons.date)
-    .limit(5);
+    .limit(4);
 
   const lastFeedback = await db
     .select({
@@ -63,6 +65,48 @@ export default async function MePage() {
     .innerJoin(schema.lessons, eq(schema.lessons.id, schema.lessonFeedback.lessonId))
     .where(eq(schema.lessonFeedback.riderId, rider!.id))
     .orderBy(desc(schema.lessonFeedback.createdAt))
+    .limit(2);
+
+  const recentBadges = await db
+    .select({
+      id: schema.riderBadges.id,
+      awardedAt: schema.riderBadges.awardedAt,
+      name: schema.badges.name,
+      subtitle: schema.badges.subtitle,
+      categoryLabel: schema.badges.categoryLabel,
+      color: schema.badges.color,
+      iconUrl: schema.badges.iconUrl,
+    })
+    .from(schema.riderBadges)
+    .innerJoin(schema.badges, eq(schema.badges.id, schema.riderBadges.badgeId))
+    .where(eq(schema.riderBadges.riderId, rider!.id))
+    .orderBy(desc(schema.riderBadges.awardedAt))
+    .limit(3);
+
+  const topHorses = await db
+    .select({
+      horseId: schema.lessonAttendees.horseId,
+      horseName: schema.horses.name,
+      photoUrl: schema.horses.photoUrl,
+      kind: schema.horses.kind,
+      rides: sql<number>`count(*)::int`,
+    })
+    .from(schema.lessonAttendees)
+    .innerJoin(schema.lessons, eq(schema.lessons.id, schema.lessonAttendees.lessonId))
+    .innerJoin(schema.horses, eq(schema.horses.id, schema.lessonAttendees.horseId))
+    .where(
+      and(
+        eq(schema.lessonAttendees.riderId, rider!.id),
+        eq(schema.lessonAttendees.attended, true),
+      ),
+    )
+    .groupBy(
+      schema.lessonAttendees.horseId,
+      schema.horses.name,
+      schema.horses.photoUrl,
+      schema.horses.kind,
+    )
+    .orderBy(desc(sql`count(*)`))
     .limit(3);
 
   const [badgeCount] = await db
@@ -83,141 +127,348 @@ export default async function MePage() {
     );
 
   return (
-    <div className="p-6 md:p-10">
-      <PageHeader
-        eyebrow={`Alumno · ${rider!.category} · ${rider!.tier}`}
-        title={rider!.name}
-        description={`${session.primary.clubName} — todo lo que has hecho y lo que viene.`}
-      />
+    <div className="bg-mesh min-h-full">
+      <div className="stagger mx-auto max-w-6xl space-y-6 p-6 md:p-10">
+        {/* Hero del alumno */}
+        <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div className="flex items-center gap-4 md:gap-6">
+            <Avatar
+              name={rider!.name}
+              src={rider!.photoUrl}
+              size="2xl"
+              square
+              className="shadow-lift"
+            />
+            <div className="min-w-0">
+              <p className="label-eyebrow">
+                Alumno · {rider!.category.replace('_', ' ')} · {rider!.tier}
+              </p>
+              <h1 className="mt-1 font-display text-4xl font-normal leading-[0.95] tracking-tightest text-stone-900 md:text-6xl">
+                Hola,{' '}
+                <span className="italic text-brand-700">
+                  {rider!.name.split(' ')[0]}
+                </span>
+                .
+              </h1>
+              <p className="mt-2 text-sm font-medium text-stone-500 md:text-base">
+                {session.primary.clubName}
+              </p>
+            </div>
+          </div>
+        </header>
 
-      <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Kpi
-          icon={<CalendarBlankIcon size={20} weight="duotone" />}
-          label="Próximas clases"
-          value={upcoming.length}
-          href="/app/me/lessons"
-        />
-        <Kpi
-          icon={<HorseIcon size={20} weight="duotone" />}
-          label="Caballos montados"
-          value={horseCount?.n ?? 0}
-          href="/app/me/horses"
-        />
-        <Kpi
-          icon={<MedalIcon size={20} weight="duotone" />}
-          label="Insignias"
-          value={badgeCount?.n ?? 0}
-          href="/app/me/badges"
-        />
-        <Kpi
-          icon={<TrophyIcon size={20} weight="duotone" />}
-          label="Eventos abiertos"
-          value={0}
-          href="/app/me/events"
-        />
-      </section>
+        {/* KPIs */}
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MiniKpi
+            icon={<CalendarBlankIcon size={20} weight="duotone" />}
+            label="Próximas"
+            value={upcoming.length}
+            href="/app/me/lessons"
+            accent="from-sky-50 to-sky-100"
+          />
+          <MiniKpi
+            icon={<HorseIcon size={20} weight="duotone" />}
+            label="Caballos"
+            value={horseCount?.n ?? 0}
+            href="/app/me/horses"
+            accent="from-brand-50 to-brand-100"
+          />
+          <MiniKpi
+            icon={<MedalIcon size={20} weight="duotone" />}
+            label="Insignias"
+            value={badgeCount?.n ?? 0}
+            href="/app/me/badges"
+            accent="from-amber-50 to-amber-100"
+          />
+          <MiniKpi
+            icon={<TrophyIcon size={20} weight="duotone" />}
+            label="Eventos"
+            value={0}
+            href="/app/me/events"
+            accent="from-rose-50 to-rose-100"
+          />
+        </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-card">
+        {/* Bento principal */}
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          {/* Próximas clases */}
+          <div className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-card lg:col-span-3">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-2xl font-normal tracking-tightest text-stone-900">
+                Tus próximas clases
+              </h2>
+              <Link
+                href="/app/me/lessons"
+                className="text-[11px] font-bold uppercase tracking-[0.22em] text-brand-700 hover:text-brand-900"
+              >
+                Ver todas →
+              </Link>
+            </div>
+            {upcoming.length === 0 ? (
+              <EmptyState
+                title="Sin clases todavía"
+                description="Pide a tu instructor que te incluya en una clase. Aparecerá aquí al instante."
+              />
+            ) : (
+              <div className="space-y-2">
+                {upcoming.map((u) => (
+                  <Link
+                    key={u.attendeeId}
+                    href={`/app/me/lessons/${u.lessonId}` as never}
+                    className="group flex items-center gap-3 rounded-2xl border border-stone-200/70 bg-stone-50/60 p-3 transition hover:border-brand-300 hover:bg-white"
+                  >
+                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-brand-100 text-brand-800">
+                      <div className="text-[10px] font-bold uppercase tracking-widest">
+                        {new Date(u.date).toLocaleDateString('es-ES', {
+                          month: 'short',
+                        })}
+                      </div>
+                      <div className="text-lg font-bold leading-none">
+                        {new Date(u.date).getDate()}
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold capitalize text-stone-900">
+                        Clase de {u.discipline.replace('_', ' ')}
+                      </div>
+                      <div className="text-[11px] font-bold uppercase tracking-widest text-stone-500">
+                        {formatDateTime(u.date, {
+                          weekday: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                        {u.horseName ? ` · ${u.horseName}` : ''}
+                      </div>
+                    </div>
+                    {u.horseName && (
+                      <Avatar
+                        name={u.horseName}
+                        src={u.horsePhoto}
+                        size="md"
+                        square
+                      />
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Insignias */}
+          <div className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-gradient-to-br from-amber-50 to-rose-50 p-6 shadow-card lg:col-span-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-2xl font-normal tracking-tightest text-stone-900">
+                Insignias
+              </h2>
+              <Link
+                href="/app/me/badges"
+                className="text-[11px] font-bold uppercase tracking-[0.22em] text-brand-700 hover:text-brand-900"
+              >
+                Ver todas →
+              </Link>
+            </div>
+            {recentBadges.length === 0 ? (
+              <p className="text-sm font-medium text-stone-500">
+                Aún sin insignias. Tu instructor las otorga al cumplir hitos.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentBadges.slice(0, 1).map((b) => (
+                  <BadgeCard
+                    key={b.id}
+                    clubName={session.primary.clubName}
+                    recipientName={rider!.name}
+                    badge={b}
+                    ratio="compact"
+                  />
+                ))}
+                {recentBadges.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <AvatarStack
+                      people={recentBadges.slice(1).map((b) => ({
+                        name: b.name,
+                        src: b.iconUrl,
+                      }))}
+                      size="md"
+                    />
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-stone-600">
+                      +{recentBadges.length - 1} más
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Caballos favoritos */}
+        <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-stone-900">Tus próximas clases</h2>
+            <h2 className="font-display text-2xl font-normal tracking-tightest text-stone-900">
+              Tus caballos favoritos
+            </h2>
             <Link
-              href="/app/me/lessons"
-              className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700 hover:text-brand-900"
+              href="/app/me/horses"
+              className="text-[11px] font-bold uppercase tracking-[0.22em] text-brand-700 hover:text-brand-900"
             >
-              Ver todas
+              Ver todos →
             </Link>
           </div>
-          {upcoming.length === 0 ? (
-            <EmptyState
-              title="Sin clases todavía"
-              description="Pide a tu instructor que te asigne a una clase. Aparecerá aquí al instante."
-            />
+          {topHorses.length === 0 ? (
+            <div className="rounded-3xl border-2 border-dashed border-stone-300 bg-white/60 p-8 text-center">
+              <HorseIcon
+                size={32}
+                weight="duotone"
+                className="mx-auto text-brand-700"
+              />
+              <p className="mt-2 text-sm font-medium text-stone-500">
+                Cuando montes en una clase realizada, tus caballos aparecerán
+                aquí ordenados por afinidad.
+              </p>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {upcoming.map((u) => (
-                <div
-                  key={u.attendeeId}
-                  className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 p-3"
-                >
-                  <div>
-                    <div className="text-sm font-bold text-stone-900">
-                      {formatDateTime(u.date)}
-                    </div>
-                    <div className="text-[11px] font-bold uppercase tracking-widest text-stone-500">
-                      {u.discipline}
-                      {u.horseName ? ` · ${u.horseName}` : ' · caballo por asignar'}
-                    </div>
-                  </div>
-                  {u.horseName && <Badge tone="brand">{u.horseName}</Badge>}
-                </div>
-              ))}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {topHorses.map((h, i) => {
+                const affinity = Math.min(99, h.rides * 12);
+                const ranking = ['Tu favorito', 'Segundo', 'Tercero'][i];
+                return (
+                  <Link
+                    key={h.horseId ?? ''}
+                    href={`/app/me/horses/${h.horseId}` as never}
+                    className="group relative overflow-hidden rounded-3xl border border-stone-200/80 bg-white shadow-card transition hover:-translate-y-1 hover:shadow-lift"
+                  >
+                    {h.photoUrl && (
+                      <div className="relative aspect-[4/3] w-full bg-stone-100">
+                        <Avatar
+                          name={h.horseName}
+                          src={h.photoUrl}
+                          size="2xl"
+                          square
+                          className="!h-full !w-full !rounded-none"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-stone-900/60 to-transparent" />
+                        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-stone-900 shadow">
+                          {ranking}
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between text-white">
+                          <div>
+                            <div className="font-display text-2xl font-normal leading-tight">
+                              {h.horseName}
+                            </div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest opacity-80">
+                              {h.kind} · {h.rides} montura
+                              {h.rides !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                          <Badge tone="brand">{affinity}%</Badge>
+                        </div>
+                      </div>
+                    )}
+                    {!h.photoUrl && (
+                      <div className="p-5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+                            <HorseIcon size={22} weight="duotone" />
+                          </div>
+                          <div>
+                            <div className="text-base font-bold text-stone-900">
+                              {h.horseName}
+                            </div>
+                            <div className="text-[11px] font-bold uppercase tracking-widest text-stone-500">
+                              {h.kind} · {h.rides} montura
+                              {h.rides !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge tone="brand" className="mt-3">
+                          afinidad {affinity}%
+                        </Badge>
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-stone-900">Comentarios recientes</h2>
-            <ChatCircleTextIcon size={18} weight="duotone" className="text-brand-700" />
-          </div>
-          {lastFeedback.length === 0 ? (
-            <p className="text-sm font-medium text-stone-500">
-              Cuando tu instructor publique feedback, aparecerá aquí. Si usa la
-              IA, será inmediato después de cada clase.
-            </p>
-          ) : (
+        {/* Feedback reciente */}
+        {lastFeedback.length > 0 && (
+          <section className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-card">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-2xl font-normal tracking-tightest text-stone-900">
+                Comentarios del instructor
+              </h2>
+              <ChatCircleTextIcon
+                size={20}
+                weight="duotone"
+                className="text-brand-700"
+              />
+            </div>
             <div className="space-y-3">
               {lastFeedback.map((f) => (
                 <div
                   key={f.id}
-                  className="rounded-xl border border-stone-200 bg-stone-50 p-3"
+                  className="rounded-2xl border border-stone-200/70 bg-stone-50/60 p-4"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-bold uppercase tracking-widest text-stone-500">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-stone-500">
                       Clase del {formatDateTime(f.lessonDate)}
                     </div>
                     {f.source === 'ia' && <Badge tone="info">IA</Badge>}
                   </div>
-                  <p className="mt-1 text-sm font-medium leading-relaxed text-stone-800">
+                  <p className="text-sm font-medium leading-relaxed text-stone-800">
                     {f.body}
                   </p>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </section>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
 
-function Kpi({
+function MiniKpi({
   icon,
   label,
   value,
   href,
+  accent,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   href: string;
+  accent: string;
 }) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-3xl border border-stone-200 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-300"
+      className="group relative overflow-hidden rounded-2xl border border-stone-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lift"
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
-        {icon}
-      </div>
-      <div className="flex-1">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
-          {label}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-50`}
+      />
+      <div className="relative flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-700 shadow-card">
+          {icon}
         </div>
-        <div className="text-2xl font-bold text-stone-900">{value}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
+            {label}
+          </div>
+          <div className="font-display text-3xl font-normal leading-none tracking-tightest text-stone-900">
+            {value}
+          </div>
+        </div>
+        <ArrowRightIcon
+          size={14}
+          className="self-end text-stone-300 group-hover:text-brand-700"
+        />
       </div>
-      <ArrowRightIcon size={14} className="text-stone-300 group-hover:text-brand-600" />
     </Link>
   );
 }
