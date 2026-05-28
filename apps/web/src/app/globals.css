@@ -40,6 +40,29 @@
   }
 }
 
+/* Keyframes definidos aquí para garantizar que el bundle los incluye.
+   Si los dejamos sólo en tailwind.config y ninguna utility los usa
+   directamente, el purgado los puede dejar fuera y .stagger queda en
+   opacity:0 (la pantalla aparece "en blanco"). */
+@keyframes equm-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes equm-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 @layer utilities {
   .scrollbar-none {
     scrollbar-width: none;
@@ -74,12 +97,11 @@
       rgba(231, 229, 228, 0.35) 100%
     );
     background-size: 200% 100%;
-    animation: shimmer 1.6s linear infinite;
+    animation: equm-shimmer 1.6s linear infinite;
   }
 
   .stagger > * {
-    opacity: 0;
-    animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: equm-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
   .stagger > *:nth-child(1) { animation-delay: 20ms; }
   .stagger > *:nth-child(2) { animation-delay: 60ms; }
