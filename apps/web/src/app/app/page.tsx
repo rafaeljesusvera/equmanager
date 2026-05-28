@@ -17,6 +17,7 @@ import {
   BellIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, roleLabel } from '@/lib/db';
+import { RiderHome } from './_rider-home';
 
 export const metadata = { title: 'Inicio' };
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,17 @@ export default async function AppHome() {
   const session = await ensureSession();
   const { primary, user, memberships } = session;
   const roles = Array.from(new Set(memberships.map((m) => m.role)));
+
+  const isStaffEarly = roles.some((r) =>
+    ['owner', 'admin', 'instructor'].includes(r),
+  );
+
+  // Si el usuario NO es staff y SÍ es rider, le damos la home visual
+  // específica del alumno: bento de insignias destacadas, caballos
+  // favoritos, bonos y eventos sin tener que cambiar de pantalla.
+  if (!isStaffEarly && roles.includes('rider')) {
+    return <RiderHome session={session} />;
+  }
 
   const [horseCount] = await db
     .select({ n: sql<number>`count(*)::int` })
