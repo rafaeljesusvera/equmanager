@@ -187,16 +187,14 @@ export async function RiderHome({ session }: { session: CurrentSession & { prima
         </header>
 
         {/* ░░░░ INSIGNIAS DESTACADAS ░░░░ */}
-        <section className="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-rose-50 to-brand-50 p-6 shadow-lift md:p-8">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-amber-300/30 blur-3xl"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-20 -left-12 h-56 w-56 rounded-full bg-brand-300/25 blur-3xl"
-          />
-
+        <section
+          className="relative overflow-hidden rounded-3xl border border-amber-200 p-6 shadow-lift md:p-8"
+          style={{
+            backgroundColor: '#fffaf2',
+            backgroundImage:
+              'radial-gradient(at 88% 8%, rgba(250, 220, 141, 0.65) 0px, transparent 55%), radial-gradient(at 8% 92%, rgba(143, 195, 149, 0.45) 0px, transparent 55%), radial-gradient(at 50% 50%, rgba(255, 226, 226, 0.45) 0px, transparent 60%)',
+          }}
+        >
           <div className="relative">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -683,7 +681,7 @@ export async function RiderHome({ session }: { session: CurrentSession & { prima
         </section>
 
         {/* Footer subtle */}
-        <section className="rounded-2xl border border-stone-200/70 bg-white/60 p-4 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-stone-500 backdrop-blur">
+        <section className="rounded-2xl border border-stone-200/70 bg-white/80 p-4 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-stone-500">
           <span className="inline-flex items-center gap-1.5">
             <LockKeyIcon size={11} weight="bold" /> Sigue montando para
             desbloquear más

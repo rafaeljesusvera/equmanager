@@ -33,7 +33,11 @@
     @apply rounded-2xl border border-stone-200/70 bg-white;
   }
   .surface-glass {
-    @apply rounded-3xl border border-white/60 bg-white/70 shadow-lift backdrop-blur-xl;
+    /* Antes usaba backdrop-blur-xl para un efecto cristal. Resultaba
+       carísimo de paint cuando había varios elementos así y producía
+       jank al hacer scroll en móvil. Mantenemos el look 'translúcido'
+       con un fondo blanco semi-opaco sin coste de blur. */
+    @apply rounded-3xl border border-white/60 bg-white/85 shadow-lift;
   }
   .label-eyebrow {
     @apply text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500;

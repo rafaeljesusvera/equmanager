@@ -109,7 +109,7 @@ export default async function MeBadgesPage() {
                     ratio="compact"
                     locked={!got}
                   />
-                  <div className="mt-2 rounded-2xl border border-stone-200/70 bg-white/80 p-2 text-center backdrop-blur">
+                  <div className="mt-2 rounded-2xl border border-stone-200/70 bg-white p-2 text-center">
                     {got ? (
                       <p className="text-[10px] font-bold uppercase tracking-widest text-brand-700">
                         Conseguida · {formatDate(got.awardedAt)}
