@@ -92,6 +92,7 @@ export function buildNav(roles: ClubRole[]): NavSection[] {
     items: [
       { href: '/app/messages', label: 'Mensajes', icon: 'ChatCircle', roles: [...CLUB_ROLES_ALL] },
       { href: '/app/feed', label: 'Feed', icon: 'Sparkle', roles: [...CLUB_ROLES_ALL] },
+      { href: '/app/people', label: 'Personas', icon: 'UsersThree', roles: [...CLUB_ROLES_ALL] },
     ],
   });
 
