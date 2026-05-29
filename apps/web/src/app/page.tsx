@@ -19,6 +19,8 @@ import {
   CheckCircleIcon,
   ChatCircleTextIcon,
   UsersThreeIcon,
+  ChatCircleIcon,
+  SealCheckIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { LogoFull, LogoMark } from '@/components/brand/Logo';
 
@@ -141,7 +143,7 @@ export default function HomePage() {
       <section className="mx-auto max-w-6xl px-6 py-12 md:py-16">
         <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="label-eyebrow">Un espacio · Cuatro perfiles</p>
+            <p className="label-eyebrow">Un espacio · Seis perfiles</p>
             <h2 className="mt-2 text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">
               Todo el mundo en la hípica,{' '}
               <span className="text-brand-700">conectado</span>.
@@ -153,12 +155,18 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <RoleCard
             icon={<HorseIcon size={32} weight="duotone" />}
             title="Propietario de hípica"
-            text="Clases, cursos, eventos, noticias y bonos. Mozos con su checklist diaria."
+            text="Clases, cursos, eventos, noticias y bonos. Equipo con su checklist."
             tone="brand"
+          />
+          <RoleCard
+            icon={<MicrophoneStageIcon size={32} weight="duotone" />}
+            title="Monitor o profesor"
+            text="Imparte clases con la Bandeja IA. Reparte feedback en segundos."
+            tone="sky"
           />
           <RoleCard
             icon={<CertificateIcon size={32} weight="duotone" />}
@@ -169,7 +177,7 @@ export default function HomePage() {
           <RoleCard
             icon={<GraduationCapIcon size={32} weight="duotone" />}
             title="Alumno o corredor"
-            text="Próximas clases, caballo asignado, afinidad, insignias y eventos."
+            text="Próximas clases, caballo asignado, calendario federado e insignias."
             tone="sky"
           />
           <RoleCard
@@ -177,6 +185,12 @@ export default function HomePage() {
             title="Mozo de cuadra"
             text="Checklists del día por caballo. Una pulsación y el propietario lo sabe."
             tone="rose"
+          />
+          <RoleCard
+            icon={<StethoscopeIcon size={32} weight="duotone" />}
+            title="Proveedor"
+            text="Veterinario, herrador, dentista, fisio. Tu agenda con todos los clientes."
+            tone="brand"
           />
         </div>
       </section>
@@ -248,6 +262,35 @@ export default function HomePage() {
                 icon: <MicrophoneStageIcon size={18} weight="duotone" />,
                 label: 'Bandeja IA',
                 text: 'Nota de voz convertida en feedback por alumno.',
+              },
+            ]}
+          />
+
+          <ProfileBreakdown
+            icon={<MicrophoneStageIcon size={26} weight="duotone" />}
+            title="Monitor o profesor"
+            subtitle="Instructores y entrenadores"
+            tone="sky"
+            features={[
+              {
+                icon: <CalendarBlankIcon size={18} weight="duotone" />,
+                label: 'Calendario unificado',
+                text: 'Tus clases de uno o varios centros en una sola agenda.',
+              },
+              {
+                icon: <MicrophoneStageIcon size={18} weight="duotone" />,
+                label: 'Bandeja IA',
+                text: 'Nota de voz al terminar y feedback repartido por alumno.',
+              },
+              {
+                icon: <MedalIcon size={18} weight="duotone" />,
+                label: 'Insignias y progresos',
+                text: 'Reconoces logros con un toque.',
+              },
+              {
+                icon: <ChatCircleIcon size={18} weight="duotone" />,
+                label: 'Mensajería directa',
+                text: 'Habla con tus alumnos sin salir de la app.',
               },
             ]}
           />
@@ -340,6 +383,35 @@ export default function HomePage() {
                 icon: <HorseIcon size={18} weight="duotone" />,
                 label: 'Caballos asignados',
                 text: 'Tu lista del día, ordenada por prioridad.',
+              },
+            ]}
+          />
+
+          <ProfileBreakdown
+            icon={<StethoscopeIcon size={26} weight="duotone" />}
+            title="Proveedor"
+            subtitle="Veterinario, herrador, dentista, fisio…"
+            tone="brand"
+            features={[
+              {
+                icon: <CalendarBlankIcon size={18} weight="duotone" />,
+                label: 'Agenda multicentro',
+                text: 'Tus visitas en todos los centros con los que trabajas.',
+              },
+              {
+                icon: <SealCheckIcon size={18} weight="duotone" />,
+                label: 'Ficha profesional',
+                text: 'Especialidad, teléfono y servicios siempre visibles para tus clientes.',
+              },
+              {
+                icon: <ChatCircleIcon size={18} weight="duotone" />,
+                label: 'Mensajería directa',
+                text: 'Habla con propietarios y centros sin intermediarios.',
+              },
+              {
+                icon: <HorseIcon size={18} weight="duotone" />,
+                label: 'Historial por caballo',
+                text: 'Tus visitas y tratamientos asociados a cada animal.',
               },
             ]}
           />

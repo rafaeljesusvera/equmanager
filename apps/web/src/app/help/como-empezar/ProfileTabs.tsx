@@ -8,6 +8,7 @@ import {
   CertificateIcon,
   GraduationCapIcon,
   ClipboardTextIcon,
+  StethoscopeIcon,
   CheckCircleIcon,
   ArrowRightIcon,
 } from '@phosphor-icons/react/dist/ssr';
@@ -262,6 +263,59 @@ const PROFILES: Profile[] = [
     next: [
       { label: 'Crear cuenta', href: '/signup' },
       { label: 'Mi día (mozo)', href: '/app/groom' },
+    ],
+  },
+  {
+    key: 'provider',
+    label: 'Proveedor',
+    short: 'Veterinario, herrador, dentista, fisio…',
+    icon: <StethoscopeIcon size={20} weight="duotone" />,
+    steps: [
+      {
+        title: 'Crea tu cuenta',
+        body: (
+          <>
+            Desde{' '}
+            <Link href="/signup" className="font-bold text-brand-700">
+              Crear cuenta
+            </Link>{' '}
+            con tu email profesional. Te creamos el espacio para tu agenda.
+          </>
+        ),
+      },
+      {
+        title: 'Elige “Soy proveedor”',
+        body: 'Última opción del onboarding. Es la específica para profesionales que visitan varios centros.',
+      },
+      {
+        title: 'Selecciona los centros con los que trabajas',
+        body: (
+          <>
+            Multi-selección de hípicas. Por cada una creamos tu acceso al
+            club, manteniendo una <strong>única agenda unificada</strong> que
+            las cruza todas.
+          </>
+        ),
+      },
+      {
+        title: 'Completa tu ficha profesional',
+        body: (
+          <>
+            En <strong>Mi agenda</strong> rellenas tu especialidad
+            (veterinario, herrador, dentista, fisio, nutrición, transporte,
+            seguros…), nombre comercial, teléfono y notas con tus servicios.
+            Los propietarios la ven al pedirte una visita.
+          </>
+        ),
+      },
+      {
+        title: 'Recibe tu primera visita',
+        body: 'Cuando un propietario te asigne a un caballo en su agenda de cuidados, aparecerá en tu panel con el detalle del centro y la hora.',
+      },
+    ],
+    next: [
+      { label: 'Crear cuenta', href: '/signup' },
+      { label: 'Mi agenda', href: '/app/provider' },
     ],
   },
 ];
