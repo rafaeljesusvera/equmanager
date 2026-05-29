@@ -38,7 +38,9 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPrivate =
-    path.startsWith('/app') || path.startsWith('/onboarding');
+    path.startsWith('/app') ||
+    path.startsWith('/onboarding') ||
+    path.startsWith('/admin');
   const isAuthPage = path.startsWith('/login') || path.startsWith('/signup');
 
   if (isPrivate && !user) {
