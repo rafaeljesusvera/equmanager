@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ToastHost } from '@/components/ui/Toast';
 import { NavProgress } from '@/components/shell/NavProgress';
+import { ChunkErrorReloader } from '@/components/shell/ChunkErrorReloader';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-stone-50 font-sans text-stone-900 antialiased">
+        <ChunkErrorReloader />
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
