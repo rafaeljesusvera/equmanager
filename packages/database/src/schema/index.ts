@@ -17,3 +17,4 @@ export * from './notifications';
 export * from './help';
 export * from './profile_links';
 export * from './directory';
+export * from './join_requests';

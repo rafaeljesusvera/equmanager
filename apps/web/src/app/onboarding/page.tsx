@@ -5,12 +5,15 @@ import {
   CertificateIcon,
   GraduationCapIcon,
   ClipboardTextIcon,
+  MicrophoneStageIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { getSessionOrRedirect } from '@/lib/db';
 import { LogoMark } from '@/components/brand/Logo';
-import { Button, Field, Input, Select } from '@/components/ui';
+import { Button, Field } from '@/components/ui';
 import { ClubNameAutocomplete } from '@/components/onboarding/ClubNameAutocomplete';
-import { createClubAction, joinClubAction } from './actions';
+import { ClubMultiPicker } from '@/components/onboarding/ClubMultiPicker';
+import { ClubSinglePicker } from '@/components/onboarding/ClubSinglePicker';
+import { createClubAction, joinClubsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Bienvenido' };
@@ -46,7 +49,8 @@ export default async function OnboardingPage({
         {choice === 'owner' && <OwnerForm />}
         {(choice === 'horse_owner' ||
           choice === 'rider' ||
-          choice === 'groom') && <JoinForm preset={choice} />}
+          choice === 'groom' ||
+          choice === 'instructor') && <JoinForm preset={choice} />}
       </section>
     </main>
   );
@@ -71,22 +75,28 @@ function RoleChooser() {
           text="Quiero gestionar mi club, dar de alta clases, eventos y bonos."
         />
         <RoleChip
+          href="/onboarding?as=instructor"
+          icon={<MicrophoneStageIcon size={28} weight="duotone" />}
+          title="Soy monitor o profesor"
+          text="Imparto clases en uno o varios centros. Reparto feedback con IA."
+        />
+        <RoleChip
           href="/onboarding?as=horse_owner"
           icon={<CertificateIcon size={28} weight="duotone" />}
           title="Soy propietario de un caballo"
-          text="Quiero ver la agenda y los cuidados de mi caballo."
+          text="Tengo uno o varios caballos en pupilaje y quiero su agenda."
         />
         <RoleChip
           href="/onboarding?as=rider"
           icon={<GraduationCapIcon size={28} weight="duotone" />}
           title="Soy alumno o corredor"
-          text="Quiero apuntarme a clases, ver eventos y mi afinidad."
+          text="Quiero apuntarme a clases y ver eventos de mi hípica."
         />
         <RoleChip
           href="/onboarding?as=groom"
           icon={<ClipboardTextIcon size={28} weight="duotone" />}
           title="Soy mozo de cuadra"
-          text="Quiero el checklist diario de cada caballo asignado."
+          text="Trabajo en uno o varios centros y llevo sus checklists."
         />
       </div>
 
@@ -164,21 +174,38 @@ function OwnerForm() {
   );
 }
 
-function JoinForm({ preset }: { preset: 'horse_owner' | 'rider' | 'groom' }) {
-  const presetLabels: Record<typeof preset, { title: string; subtitle: string }> = {
+function JoinForm({
+  preset,
+}: {
+  preset: 'horse_owner' | 'rider' | 'groom' | 'instructor';
+}) {
+  const presetLabels: Record<
+    typeof preset,
+    { title: string; subtitle: string; multi: boolean }
+  > = {
     horse_owner: {
-      title: 'Únete como propietario de caballo',
-      subtitle: 'Necesitas el código de la hípica de tu caballo.',
+      title: 'Tus caballos en propiedad',
+      subtitle:
+        'Elige el centro o centros donde tienes caballos en pupilaje. Después podrás añadir más.',
+      multi: true,
     },
     rider: {
-      title: 'Únete como alumno',
+      title: 'Tu hípica',
       subtitle:
-        'Pídele a tu profesor o a la hípica el código (lo tienen en su panel).',
+        'Elige el centro donde montas. Si está federado al RFHE o a una autonómica, lo encontramos por ti.',
+      multi: false,
     },
     groom: {
-      title: 'Únete como mozo',
+      title: 'Tus centros como mozo',
       subtitle:
-        'Te aparecerá la lista de caballos asignados en cuanto la hípica te dé acceso.',
+        'Selecciona los clubes donde trabajas. Verás las tareas diarias de cada uno separadas.',
+      multi: true,
+    },
+    instructor: {
+      title: 'Centros donde impartes clase',
+      subtitle:
+        'Selecciona uno o varios centros. Tendrás un calendario y bandeja IA unificados.',
+      multi: true,
     },
   };
   const labels = presetLabels[preset];
@@ -196,30 +223,20 @@ function JoinForm({ preset }: { preset: 'horse_owner' | 'rider' | 'groom' }) {
         {labels.subtitle}
       </p>
 
-      <form action={joinClubAction} className="mt-6 space-y-3">
+      <form action={joinClubsAction} className="mt-6 space-y-4">
+        <input type="hidden" name="role" value={preset} />
         <Field
-          label="Código de la hípica"
-          hint="Lo identifica de forma única, todo en minúsculas (ej. hipica-valdebebas)."
+          label={labels.multi ? 'Centros' : 'Centro'}
+          hint="Busca por nombre y selecciona la opción que coincida."
         >
-          <Input
-            required
-            name="slug"
-            minLength={3}
-            maxLength={40}
-            placeholder="hipica-valdebebas"
-            pattern="[a-z0-9][a-z0-9-]*"
-          />
-        </Field>
-        <Field label="Voy a entrar como">
-          <Select name="role" defaultValue={preset}>
-            <option value="rider">Alumno / corredor</option>
-            <option value="horse_owner">Propietario de caballo</option>
-            <option value="groom">Mozo</option>
-            <option value="instructor">Instructor</option>
-          </Select>
+          {labels.multi ? (
+            <ClubMultiPicker />
+          ) : (
+            <ClubSinglePicker />
+          )}
         </Field>
         <Button type="submit" size="lg" className="w-full">
-          Unirme a la hípica
+          {labels.multi ? 'Unirme a estos centros' : 'Unirme a este centro'}
         </Button>
       </form>
     </div>

@@ -145,77 +145,129 @@ export async function createClubAction(formData: FormData) {
 }
 
 /**
- * Une al usuario a un club existente con un rol determinado.
+ * Une al usuario a uno o varios centros eligiendo del directorio público.
+ * - Si el `directory_club` tiene club operativo vinculado: crea el
+ *   club_member directamente (rider, horse_owner, instructor o groom).
+ * - Si no tiene club operativo: registra la solicitud en
+ *   `club_join_requests` con status 'pendiente' para avisar al admin y al
+ *   propio usuario cuando alguien reclame el padrón.
  */
-export async function joinClubAction(formData: FormData) {
+export async function joinClubsAction(formData: FormData) {
   const user = await getCurrentUser();
   if (!user || !user.email) redirect('/login');
   await ensureProfile({ id: user.id, email: user.email });
 
-  const rawSlug = String(formData.get('slug') ?? '')
-    .trim()
-    .toLowerCase();
   const role = String(formData.get('role') ?? '') as ClubRole;
+  const idsRaw = String(formData.get('directoryClubIds') ?? '').trim();
+  const ids = idsRaw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   if (!CLUB_ROLES.includes(role) || role === 'owner' || role === 'admin') {
     redirect('/onboarding?error=' + encodeURIComponent('Rol no permitido'));
   }
-
-  const [club] = await db
-    .select()
-    .from(schema.clubs)
-    .where(eq(schema.clubs.slug, rawSlug))
-    .limit(1);
-
-  if (!club) {
+  if (ids.length === 0) {
     redirect(
-      '/onboarding?error=' +
-        encodeURIComponent(
-          'No hemos encontrado ese código de hípica. Revísalo con tu profesor.',
-        ),
+      '/onboarding?as=' +
+        role +
+        '&error=' +
+        encodeURIComponent('Selecciona al menos un centro.'),
     );
   }
 
-  const [existing] = await db
-    .select()
-    .from(schema.clubMembers)
-    .where(
-      and(
-        eq(schema.clubMembers.clubId, club.id),
-        eq(schema.clubMembers.profileId, user.id),
-      ),
-    )
-    .limit(1);
+  let joinedCount = 0;
+  let pendingCount = 0;
 
-  if (!existing) {
-    await db.insert(schema.clubMembers).values({
-      clubId: club.id,
-      profileId: user.id,
-      role,
-    });
+  for (const directoryId of ids) {
+    const [dir] = await db
+      .select()
+      .from(schema.directoryClubs)
+      .where(eq(schema.directoryClubs.id, directoryId))
+      .limit(1);
+    if (!dir) continue;
+
+    // ¿Hay club operativo vinculado?
+    const [club] = await db
+      .select()
+      .from(schema.clubs)
+      .where(eq(schema.clubs.directoryClubId, dir.id))
+      .limit(1);
+
+    if (club) {
+      const [member] = await db
+        .select()
+        .from(schema.clubMembers)
+        .where(
+          and(
+            eq(schema.clubMembers.clubId, club.id),
+            eq(schema.clubMembers.profileId, user.id),
+          ),
+        )
+        .limit(1);
+
+      if (!member) {
+        await db.insert(schema.clubMembers).values({
+          clubId: club.id,
+          profileId: user.id,
+          role,
+        });
+        joinedCount++;
+      }
+
+      // Si es rider, le creamos su entrada en `riders` si no existe
+      if (role === 'rider') {
+        const [existingRider] = await db
+          .select({ id: schema.riders.id })
+          .from(schema.riders)
+          .where(
+            and(
+              eq(schema.riders.clubId, club.id),
+              eq(schema.riders.profileId, user.id),
+            ),
+          )
+          .limit(1);
+        if (!existingRider) {
+          await db.insert(schema.riders).values({
+            clubId: club.id,
+            profileId: user.id,
+            name: (user.user_metadata?.full_name as string) || user.email!,
+            email: user.email,
+            category: 'adulto',
+            tier: 'iniciacion',
+          });
+        }
+      }
+
+      await db.insert(schema.notifications).values({
+        profileId: user.id,
+        clubId: club.id,
+        kind: 'sistema',
+        title: `Bienvenido a ${club.name}`,
+        body: 'Ya formas parte del centro.',
+        link: '/app',
+      });
+    } else {
+      await db
+        .insert(schema.clubJoinRequests)
+        .values({
+          profileId: user.id,
+          directoryClubId: dir.id,
+          requestedRole: role,
+          status: 'pendiente',
+        });
+      pendingCount++;
+    }
   }
-
-  // Si es rider, le creamos su entrada en `riders`
-  if (role === 'rider' && !existing) {
-    await db.insert(schema.riders).values({
-      clubId: club.id,
-      profileId: user.id,
-      name: (user.user_metadata?.full_name as string) || user.email!,
-      email: user.email,
-      category: 'adulto',
-      tier: 'iniciacion',
-    });
-  }
-
-  await db.insert(schema.notifications).values({
-    profileId: user.id,
-    clubId: club.id,
-    kind: 'sistema',
-    title: `Bienvenido a ${club.name}`,
-    body: 'Ya formas parte de la hípica. Echa un vistazo a tu panel.',
-    link: '/app',
-  });
 
   revalidatePath('/app');
+  if (joinedCount === 0 && pendingCount > 0) {
+    redirect(
+      '/app?message=' +
+        encodeURIComponent(
+          'Tu solicitud está guardada. Te avisaremos cuando tu centro active Equmanager.',
+        ),
+    );
+  }
   redirect('/app');
 }
