@@ -26,8 +26,14 @@ export default async function GroomChecklistPage({
   assertRole(session, ['groom', 'owner', 'admin']);
   const { horseId } = await params;
 
-  const [horse] = await db
-    .select()
+  const [horseBase] = await db
+    .select({
+      id: schema.horses.id,
+      clubId: schema.horses.clubId,
+      name: schema.horses.name,
+      kind: schema.horses.kind,
+      status: schema.horses.status,
+    })
     .from(schema.horses)
     .where(
       and(
@@ -36,7 +42,20 @@ export default async function GroomChecklistPage({
       ),
     )
     .limit(1);
-  if (!horse) notFound();
+  if (!horseBase) notFound();
+  // Si la migración 0007 está aplicada, leemos la plantilla específica.
+  let horseCareTemplateId: string | null = null;
+  try {
+    const [t] = await db
+      .select({ careTemplateId: schema.horses.careTemplateId })
+      .from(schema.horses)
+      .where(eq(schema.horses.id, horseId))
+      .limit(1);
+    horseCareTemplateId = t?.careTemplateId ?? null;
+  } catch {
+    // columna care_template_id no existe todavía, ok
+  }
+  const horse = { ...horseBase, careTemplateId: horseCareTemplateId };
 
   // Usa la plantilla asignada al caballo si existe; si no, la primera del club.
   let template: typeof schema.horseCareTemplates.$inferSelect | undefined;

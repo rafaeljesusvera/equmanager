@@ -65,26 +65,57 @@ export async function updateHorseAction(formData: FormData) {
   if (!name || !HORSE_KINDS.includes(kind) || !HORSE_STATUSES.includes(status))
     return;
 
-  await db
-    .update(schema.horses)
-    .set({
-      name,
-      kind,
-      breed,
-      birthYear,
-      color,
-      photoUrl,
-      notes,
-      status,
-      careTemplateId,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(schema.horses.id, id),
-        eq(schema.horses.clubId, session.primary.clubId),
-      ),
-    );
+  try {
+    await db
+      .update(schema.horses)
+      .set({
+        name,
+        kind,
+        breed,
+        birthYear,
+        color,
+        photoUrl,
+        notes,
+        status,
+        careTemplateId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.horses.id, id),
+          eq(schema.horses.clubId, session.primary.clubId),
+        ),
+      );
+  } catch (err) {
+    // Si la migración 0007 (care_template_id) todavía no se ha aplicado,
+    // reintentamos sin esa columna para no bloquear el flujo.
+    if (
+      err instanceof Error &&
+      /care_template_id|careTemplateId/.test(err.message)
+    ) {
+      await db
+        .update(schema.horses)
+        .set({
+          name,
+          kind,
+          breed,
+          birthYear,
+          color,
+          photoUrl,
+          notes,
+          status,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.horses.id, id),
+            eq(schema.horses.clubId, session.primary.clubId),
+          ),
+        );
+    } else {
+      throw err;
+    }
+  }
   revalidatePath('/app/horses');
   revalidatePath(`/app/horses/${id}`);
 }

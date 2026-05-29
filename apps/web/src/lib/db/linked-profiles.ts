@@ -42,15 +42,29 @@ export type LinkedAccount = {
 export async function getLinkedAccounts(
   ownerProfileId: string,
 ): Promise<LinkedAccount[]> {
-  const links = await db
-    .select()
-    .from(schema.profileLinks)
-    .where(
-      and(
-        eq(schema.profileLinks.ownerProfileId, ownerProfileId),
-        eq(schema.profileLinks.status, 'activa'),
-      ),
-    );
+  // Defensivo: si la migración 0004 todavía no se ha aplicado en producción,
+  // la tabla profile_links no existe y la sesión entera reventaría.
+  // Devolvemos array vacío en lugar de propagar el error.
+  let links: Array<typeof schema.profileLinks.$inferSelect>;
+  try {
+    links = await db
+      .select()
+      .from(schema.profileLinks)
+      .where(
+        and(
+          eq(schema.profileLinks.ownerProfileId, ownerProfileId),
+          eq(schema.profileLinks.status, 'activa'),
+        ),
+      );
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      /relation "profile_links"|profile_links/.test(err.message)
+    ) {
+      return [];
+    }
+    throw err;
+  }
 
   if (links.length === 0) return [];
 

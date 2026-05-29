@@ -59,8 +59,23 @@ export default async function HorseDetailPage({
   assertRole(session, ['owner', 'admin', 'instructor']);
   const { id } = await params;
 
-  const [horse] = await db
-    .select()
+  // Columnas explícitas para tolerar que care_template_id no exista aún
+  // en la BD (migración 0007 pendiente). El fallback queda en null.
+  const horseRows = await db
+    .select({
+      id: schema.horses.id,
+      clubId: schema.horses.clubId,
+      name: schema.horses.name,
+      kind: schema.horses.kind,
+      breed: schema.horses.breed,
+      birthYear: schema.horses.birthYear,
+      color: schema.horses.color,
+      status: schema.horses.status,
+      photoUrl: schema.horses.photoUrl,
+      notes: schema.horses.notes,
+      createdAt: schema.horses.createdAt,
+      updatedAt: schema.horses.updatedAt,
+    })
     .from(schema.horses)
     .where(
       and(
@@ -69,7 +84,24 @@ export default async function HorseDetailPage({
       ),
     )
     .limit(1);
-  if (!horse) notFound();
+  if (horseRows.length === 0) notFound();
+  const horse = {
+    ...horseRows[0]!,
+    careTemplateId: null as string | null,
+  };
+  // Si la migración 0007 está aplicada, recuperamos el valor real.
+  try {
+    const [withTemplate] = await db
+      .select({ careTemplateId: schema.horses.careTemplateId })
+      .from(schema.horses)
+      .where(eq(schema.horses.id, id))
+      .limit(1);
+    if (withTemplate?.careTemplateId !== undefined) {
+      horse.careTemplateId = withTemplate.careTemplateId ?? null;
+    }
+  } catch {
+    // columna no existe todavía, ok
+  }
 
   const owners = await db
     .select({

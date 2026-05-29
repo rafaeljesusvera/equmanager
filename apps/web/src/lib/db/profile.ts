@@ -42,13 +42,25 @@ export async function loadSession(user: {
   email: string;
   user_metadata?: Record<string, unknown> | null;
 }): Promise<CurrentSession> {
+  // Defensivo: seleccionamos columnas explícitas (sin is_superadmin) para
+  // que el endpoint funcione aunque la migración 0007 todavía no se haya
+  // aplicado en producción.
   const existing = await db
-    .select()
+    .select({
+      id: schema.profiles.id,
+      email: schema.profiles.email,
+      fullName: schema.profiles.fullName,
+      avatarUrl: schema.profiles.avatarUrl,
+      createdAt: schema.profiles.createdAt,
+      updatedAt: schema.profiles.updatedAt,
+    })
     .from(schema.profiles)
     .where(eq(schema.profiles.id, user.id))
     .limit(1);
 
-  let profile = existing[0] ?? null;
+  let profile: typeof schema.profiles.$inferSelect | null = existing[0]
+    ? { ...existing[0], isSuperadmin: false }
+    : null;
 
   if (!profile) {
     const fullName =
@@ -62,8 +74,15 @@ export async function loadSession(user: {
         email: user.email,
         fullName,
       })
-      .returning();
-    profile = created ?? null;
+      .returning({
+        id: schema.profiles.id,
+        email: schema.profiles.email,
+        fullName: schema.profiles.fullName,
+        avatarUrl: schema.profiles.avatarUrl,
+        createdAt: schema.profiles.createdAt,
+        updatedAt: schema.profiles.updatedAt,
+      });
+    profile = created ? { ...created, isSuperadmin: false } : null;
   }
 
   const memberships = await db
