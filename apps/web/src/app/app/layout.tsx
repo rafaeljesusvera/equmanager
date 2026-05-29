@@ -11,9 +11,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  console.log('[AppLayout] start');
   const session = await ensureSession();
-  console.log('[AppLayout] session loaded');
   const roles = Array.from(new Set(session.memberships.map((m) => m.role)));
   const sections = buildNav(roles);
 

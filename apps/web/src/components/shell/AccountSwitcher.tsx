@@ -10,19 +10,6 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { switchAccount } from '@/app/app/account-switch.action';
 
-const RELATION_LABEL: Record<string, string> = {
-  self: 'Yo',
-  padre: 'Padre',
-  madre: 'Madre',
-  tutor: 'Tutor/a',
-  conyuge: 'Pareja',
-  hijo: 'Hijo',
-  hija: 'Hija',
-  secretaria: 'Secretaría',
-  asistente: 'Asistente',
-  otro: 'Vinculada',
-};
-
 type SelfAccount = {
   kind: 'self';
   linkId: null;
@@ -264,6 +251,3 @@ function Avatar({
   );
 }
 
-export function relationLabelFor(relation: string) {
-  return RELATION_LABEL[relation] ?? 'Vinculada';
-}

@@ -23,13 +23,7 @@ export const metadata = { title: 'Inicio' };
 export const dynamic = 'force-dynamic';
 
 export default async function AppHome() {
-  console.log('[AppHome] start');
   const session = await ensureSession();
-  console.log('[AppHome] session loaded', {
-    userId: session.user.id,
-    primaryRole: session.primary?.role,
-    memberships: session.memberships.length,
-  });
   const { primary, user, memberships } = session;
   const roles = Array.from(new Set(memberships.map((m) => m.role)));
 
@@ -37,12 +31,13 @@ export default async function AppHome() {
     ['owner', 'admin', 'instructor'].includes(r),
   );
 
+  // Si el usuario NO es staff y SÍ es rider, le damos la home visual
+  // específica del alumno: bento de insignias destacadas, caballos
+  // favoritos, bonos y eventos sin tener que cambiar de pantalla.
   if (!isStaffEarly && roles.includes('rider')) {
-    console.log('[AppHome] -> RiderHome');
     return <RiderHome session={session} />;
   }
 
-  console.log('[AppHome] starting staff queries');
   const [horseCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.horses)
@@ -89,20 +84,12 @@ export default async function AppHome() {
     .orderBy(schema.events.startsAt)
     .limit(2);
 
-  console.log('[AppHome] queries staff OK', {
-    horseCount: horseCount?.n,
-    riderCount: riderCount?.n,
-    lessons: upcomingLessons.length,
-    events: upcomingEvents.length,
-  });
-
   const recentNotifications = await db
     .select()
     .from(schema.notifications)
     .where(eq(schema.notifications.profileId, user.id))
     .orderBy(desc(schema.notifications.createdAt))
     .limit(4);
-  console.log('[AppHome] notifs OK', recentNotifications.length);
 
   const isStaff = roles.some((r) =>
     ['owner', 'admin', 'instructor'].includes(r),

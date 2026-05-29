@@ -15,22 +15,11 @@ export async function ensureSession(): Promise<EnsuredSession> {
   const user = await getCurrentUser();
   if (!user || !user.email) redirect('/login');
 
-  let session;
-  try {
-    session = await loadSession({
-      id: user.id,
-      email: user.email,
-      user_metadata: user.user_metadata as Record<string, unknown>,
-    });
-  } catch (err) {
-    console.error('[ensureSession] loadSession failed', {
-      userId: user.id,
-      email: user.email,
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    });
-    throw err;
-  }
+  const session = await loadSession({
+    id: user.id,
+    email: user.email,
+    user_metadata: user.user_metadata as Record<string, unknown>,
+  });
 
   if (!session.primary) {
     redirect('/onboarding');

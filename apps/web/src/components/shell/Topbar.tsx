@@ -3,11 +3,8 @@ import { BellIcon } from '@phosphor-icons/react/dist/ssr';
 import { db, schema } from '@equmanager/database';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { MobileHeader } from './MobileHeader';
-import {
-  AccountSwitcher,
-  relationLabelFor,
-  type SwitcherAccount,
-} from './AccountSwitcher';
+import { AccountSwitcher, type SwitcherAccount } from './AccountSwitcher';
+import { relationLabelFor } from '@/lib/relation-labels';
 import type { NavSection } from '@/lib/nav';
 import type { CurrentSession } from '@/lib/db/profile';
 import { roleLabel as roleLabelFor } from '@/lib/db/session';
