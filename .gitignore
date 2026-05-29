@@ -69,3 +69,4 @@ blob-report/
 .claude/
 *.env.bak
 packages/database/src/test-*.ts
+packages/database/src/probe-*.mjs
