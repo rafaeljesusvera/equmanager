@@ -32,7 +32,7 @@ export function BadgeLiveEditor({
     defaultValues.categoryLabel ?? '',
   );
   const [color, setColor] = useState(defaultValues.color ?? '#3f8649');
-  const [iconUrl, setIconUrl] = useState(defaultValues.iconUrl ?? null);
+  const [iconUrl] = useState(defaultValues.iconUrl ?? null);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">

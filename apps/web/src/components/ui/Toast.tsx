@@ -37,6 +37,10 @@ export function ToastHost() {
 
   useEffect(() => {
     setMounted(true);
+    // Capturamos los refs en variables locales para usarlos en la cleanup
+    // sin que React avise de "ref might change before cleanup runs".
+    const saving = savingTimers.current;
+    const finals = finalTimers.current;
     listener = (t) => {
       if (t.kind === 'saving') {
         // Mantén un solo "guardando" a la vez: reemplaza el anterior.
@@ -78,10 +82,10 @@ export function ToastHost() {
     };
     return () => {
       listener = null;
-      savingTimers.current.forEach((t) => clearTimeout(t));
-      finalTimers.current.forEach((t) => clearTimeout(t));
-      savingTimers.current.clear();
-      finalTimers.current.clear();
+      saving.forEach((t) => clearTimeout(t));
+      finals.forEach((t) => clearTimeout(t));
+      saving.clear();
+      finals.clear();
     };
   }, []);
 
