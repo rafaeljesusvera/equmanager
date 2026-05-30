@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/page/PageHeader';
 import { AdminGrowthChart } from '@/components/admin/AdminGrowthChart';
 
 export const metadata = { title: 'Superadmin · Resumen' };
-export const dynamic = 'force-dynamic';
+export const revalidate = 300; // 5 min — datos de resumen no necesitan ser en tiempo real
 
 type MonthRow = { month: string; n: number };
 
