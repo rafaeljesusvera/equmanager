@@ -18,6 +18,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, roleLabel } from '@/lib/db';
 import { RiderHome } from './_rider-home';
+import { GroomHome } from './_groom-home';
 
 export const metadata = { title: 'Inicio' };
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,11 @@ export default async function AppHome() {
   // favoritos, bonos y eventos sin tener que cambiar de pantalla.
   if (!isStaffEarly && roles.includes('rider')) {
     return <RiderHome session={session} />;
+  }
+
+  // Mozo puro: checklist directo sin pantallas intermedias.
+  if (!isStaffEarly && roles.length === 1 && roles[0] === 'groom') {
+    return <GroomHome session={session} />;
   }
 
   const [horseCount] = await db
