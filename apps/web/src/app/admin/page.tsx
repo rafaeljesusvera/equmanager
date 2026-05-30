@@ -9,10 +9,10 @@ import {
   SealCheckIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { PageHeader } from '@/components/page/PageHeader';
-import { AdminGrowthChart } from '@/components/admin/AdminGrowthChart';
+import { AdminGrowthChartWrapper } from '@/components/admin/AdminGrowthChartWrapper';
 
 export const metadata = { title: 'Superadmin · Resumen' };
-export const revalidate = 300; // 5 min — datos de resumen no necesitan ser en tiempo real
+export const dynamic = 'force-dynamic';
 
 type MonthRow = { month: string; n: number };
 
@@ -197,7 +197,7 @@ function Kpi({
       <div className="mt-3 text-4xl font-bold tracking-tight text-stone-900">
         {value.toLocaleString('es-ES')}
       </div>
-      {series && color && <AdminGrowthChart data={series} color={color} />}
+      {series && color && <AdminGrowthChartWrapper data={series} color={color} />}
     </div>
   );
 }
