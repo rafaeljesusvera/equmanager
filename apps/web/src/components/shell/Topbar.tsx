@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { BellIcon } from '@phosphor-icons/react/dist/ssr';
 import { db, schema } from '@equmanager/database';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { MobileHeader } from './MobileHeader';
 import { AccountSwitcher, type SwitcherAccount } from './AccountSwitcher';
+import { MobileTopTitle } from './MobileTopTitle';
 import { relationLabelFor } from '@/lib/relation-labels';
 import type { NavSection } from '@/lib/nav';
 import type { CurrentSession } from '@/lib/db/profile';
@@ -43,9 +43,11 @@ export async function Topbar({
   });
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-end gap-3 border-b border-stone-200 bg-white/85 px-4 py-3 backdrop-blur md:px-6">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-stone-200 bg-white/85 px-4 py-3 backdrop-blur md:justify-end md:px-6">
+      {/* Móvil: flecha + título de la página actual */}
+      <MobileTopTitle />
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <AccountSwitcher active={active} accounts={accounts} />
         <Link
           href="/app/notifications"

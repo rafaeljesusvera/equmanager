@@ -1,4 +1,7 @@
-import { BackButton } from './BackButton';
+'use client';
+
+import { useEffect } from 'react';
+import { pageTitleStore } from '@/lib/page-title-store';
 
 export function PageHeader({
   eyebrow,
@@ -11,22 +14,22 @@ export function PageHeader({
   description?: string;
   action?: React.ReactNode;
 }) {
+  // Publica el título al Topbar en móvil
+  useEffect(() => {
+    pageTitleStore.set(title);
+    return () => pageTitleStore.set('');
+  }, [title]);
+
   return (
     <>
-      {/* Móvil: barra compacta con flecha + título centrado + acción */}
-      <div className="mb-4 flex items-center gap-2 md:hidden">
-        <BackButton />
-        <h1 className="flex-1 text-center text-base font-bold text-stone-900">
-          {title}
-        </h1>
-        {/* Placeholder para mantener el título centrado cuando hay acción */}
-        {action
-          ? <div className="shrink-0">{action}</div>
-          : <div className="w-8" />
-        }
-      </div>
+      {/* Móvil: solo muestra la acción si la hay (título ya está en el Topbar) */}
+      {action && (
+        <div className="mb-4 md:hidden">
+          {action}
+        </div>
+      )}
 
-      {/* Desktop: header grande con eyebrow + título + descripción */}
+      {/* Desktop: header grande con eyebrow + título + descripción + acción */}
       <header className="mb-8 hidden flex-wrap items-end justify-between gap-4 md:mb-10 md:flex">
         <div className="min-w-0">
           <p className="label-eyebrow">{eyebrow}</p>

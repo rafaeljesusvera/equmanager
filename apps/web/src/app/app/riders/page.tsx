@@ -21,6 +21,8 @@ import {
 import { CreatePanel } from '@/components/ui/CreatePanel';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { createRiderAction } from './actions';
+import { TrendChartWrapper } from '@/components/ui/TrendChartWrapper';
+import { buildTrend } from '@/lib/trend';
 
 export const metadata = { title: 'Alumnos' };
 export const dynamic = 'force-dynamic';
@@ -29,11 +31,14 @@ export default async function RidersPage() {
   const session = await ensureSession();
   assertRole(session, ['owner', 'admin', 'instructor']);
 
-  const riders = await db
-    .select()
-    .from(schema.riders)
-    .where(eq(schema.riders.clubId, session.primary.clubId))
-    .orderBy(schema.riders.name);
+  const [riders, trend] = await Promise.all([
+    db
+      .select()
+      .from(schema.riders)
+      .where(eq(schema.riders.clubId, session.primary.clubId))
+      .orderBy(schema.riders.name),
+    buildTrend(schema.riders, session.primary.clubId),
+  ]);
 
   return (
     <div className="p-6 md:p-10">
@@ -41,6 +46,13 @@ export default async function RidersPage() {
         eyebrow="Hípica"
         title="Alumnos"
         description="Tus jinetes y corredores. Pulsa cualquiera para abrir su ficha."
+      />
+
+      <TrendChartWrapper
+        data={trend.series}
+        total={trend.total}
+        label="Alumnos en el club · últimos 12 meses"
+        color="#7c3aed"
       />
 
       <CreatePanel label="Nuevo alumno" defaultOpen={riders.length === 0}>

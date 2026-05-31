@@ -11,6 +11,8 @@ import { Badge, Button, Field, Input, Select, EmptyState, SubmitButton,
 import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
 import { CreatePanel } from '@/components/ui/CreatePanel';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
+import { TrendChartWrapper } from '@/components/ui/TrendChartWrapper';
+import { buildTrend } from '@/lib/trend';
 import {
   createHorseAction,
   updateHorseStatusAction,
@@ -29,11 +31,14 @@ export default async function HorsesPage() {
   const session = await ensureSession();
   assertRole(session, ['owner', 'admin', 'instructor']);
 
-  const horses = await db
-    .select()
-    .from(schema.horses)
-    .where(eq(schema.horses.clubId, session.primary.clubId))
-    .orderBy(schema.horses.name);
+  const [horses, trend] = await Promise.all([
+    db
+      .select()
+      .from(schema.horses)
+      .where(eq(schema.horses.clubId, session.primary.clubId))
+      .orderBy(schema.horses.name),
+    buildTrend(schema.horses, session.primary.clubId),
+  ]);
 
   return (
     <div className="p-6 md:p-10">
@@ -41,6 +46,13 @@ export default async function HorsesPage() {
         eyebrow="Hípica"
         title="Caballos"
         description="Da de alta los caballos del club. Pulsa cualquier caballo para abrir su ficha."
+      />
+
+      <TrendChartWrapper
+        data={trend.series}
+        total={trend.total}
+        label="Caballos en el club · últimos 12 meses"
+        color="#b45309"
       />
 
       <CreatePanel label="Nuevo caballo" defaultOpen={horses.length === 0}>

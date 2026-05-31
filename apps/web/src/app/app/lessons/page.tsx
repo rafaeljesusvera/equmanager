@@ -1,5 +1,6 @@
 import { db, schema } from '@equmanager/database';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, gte, and, sql } from 'drizzle-orm';
+import { TrendChartWrapper } from '@/components/ui/TrendChartWrapper';
 import {
   CalendarBlankIcon,
   PlusIcon,
@@ -28,7 +29,12 @@ export default async function LessonsPage() {
   const session = await ensureSession();
   assertRole(session, ['owner', 'admin', 'instructor']);
 
-  const [lessons, riders, horses] = await Promise.all([
+  const since = new Date();
+  since.setMonth(since.getMonth() - 11);
+  since.setDate(1);
+  since.setHours(0, 0, 0, 0);
+
+  const [lessons, riders, horses, lessonRows, totalRow] = await Promise.all([
     db
       .select()
       .from(schema.lessons)
@@ -51,7 +57,33 @@ export default async function LessonsPage() {
       .from(schema.horses)
       .where(eq(schema.horses.clubId, session.primary.clubId))
       .orderBy(schema.horses.name),
+    db
+      .select({
+        month: sql<string>`to_char(${schema.lessons.date}, 'YYYY-MM')`,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(schema.lessons)
+      .where(and(eq(schema.lessons.clubId, session.primary.clubId), gte(schema.lessons.date, since)))
+      .groupBy(sql`to_char(${schema.lessons.date}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${schema.lessons.date}, 'YYYY-MM')`)
+      .catch(() => [] as { month: string; n: number }[]),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(schema.lessons)
+      .where(eq(schema.lessons.clubId, session.primary.clubId))
+      .catch(() => [{ n: 0 }]),
   ]);
+
+  const map = new Map(lessonRows.map((r) => [r.month, r.n]));
+  const now = new Date();
+  const lessonSeries = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      label: d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }),
+      value: map.get(key) ?? 0,
+    };
+  });
 
   const lessonIds = lessons.map((l) => l.id);
   const attendees = lessonIds.length
@@ -88,6 +120,13 @@ export default async function LessonsPage() {
         eyebrow="Hípica"
         title="Clases"
         description="Tu calendario de clases. Añade jinetes y caballos a cada sesión y deja que la IA genere el feedback."
+      />
+
+      <TrendChartWrapper
+        data={lessonSeries}
+        total={totalRow[0]?.n ?? 0}
+        label="Clases impartidas · últimos 12 meses"
+        color="#0891b2"
       />
 
       <section className="mb-8 rounded-3xl border border-stone-200 bg-white p-6 shadow-card">
