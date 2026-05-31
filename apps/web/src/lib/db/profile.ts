@@ -36,55 +36,60 @@ export type CurrentSession = {
 /**
  * Carga el profile + memberships del usuario actual.
  * Crea el profile si no existe (caso "primer login").
+ *
+ * Todas las queries independientes se lanzan en paralelo con Promise.all.
+ * isSuperadmin se lee en la misma query que el profile base (una sola
+ * round-trip) con fallback a false si la columna aún no existe.
  */
 export async function loadSession(user: {
   id: string;
   email: string;
   user_metadata?: Record<string, unknown> | null;
 }): Promise<CurrentSession> {
-  // Seleccionamos columnas explícitas. is_superadmin se intenta leer aparte
-  // por si una BD pre-0007 todavía no lo tiene.
-  const existing = await db
-    .select({
-      id: schema.profiles.id,
-      email: schema.profiles.email,
-      fullName: schema.profiles.fullName,
-      avatarUrl: schema.profiles.avatarUrl,
-      createdAt: schema.profiles.createdAt,
-      updatedAt: schema.profiles.updatedAt,
-    })
-    .from(schema.profiles)
-    .where(eq(schema.profiles.id, user.id))
-    .limit(1);
-
-  let isSuperadmin = false;
+  // Una sola query al profile intentando leer isSuperadmin junto al resto.
+  // Si la columna no existe (BD pre-0007) cae al catch y reintenta sin ella.
+  let profileRow: (typeof schema.profiles.$inferSelect) | null = null;
   try {
-    const [sa] = await db
-      .select({ isSuperadmin: schema.profiles.isSuperadmin })
+    const [row] = await db
+      .select({
+        id: schema.profiles.id,
+        email: schema.profiles.email,
+        fullName: schema.profiles.fullName,
+        avatarUrl: schema.profiles.avatarUrl,
+        isSuperadmin: schema.profiles.isSuperadmin,
+        createdAt: schema.profiles.createdAt,
+        updatedAt: schema.profiles.updatedAt,
+      })
       .from(schema.profiles)
       .where(eq(schema.profiles.id, user.id))
       .limit(1);
-    isSuperadmin = sa?.isSuperadmin ?? false;
+    profileRow = row ?? null;
   } catch {
-    // migración 0007 todavía no aplicada
+    // Columna isSuperadmin ausente (BD pre-0007): releer sin ella
+    const [row] = await db
+      .select({
+        id: schema.profiles.id,
+        email: schema.profiles.email,
+        fullName: schema.profiles.fullName,
+        avatarUrl: schema.profiles.avatarUrl,
+        createdAt: schema.profiles.createdAt,
+        updatedAt: schema.profiles.updatedAt,
+      })
+      .from(schema.profiles)
+      .where(eq(schema.profiles.id, user.id))
+      .limit(1);
+    profileRow = row ? { ...row, isSuperadmin: false } : null;
   }
 
-  let profile: typeof schema.profiles.$inferSelect | null = existing[0]
-    ? { ...existing[0], isSuperadmin }
-    : null;
-
-  if (!profile) {
+  // Primer login: crear profile
+  if (!profileRow) {
     const fullName =
       typeof user.user_metadata?.full_name === 'string'
         ? (user.user_metadata.full_name as string)
         : null;
     const [created] = await db
       .insert(schema.profiles)
-      .values({
-        id: user.id,
-        email: user.email,
-        fullName,
-      })
+      .values({ id: user.id, email: user.email, fullName })
       .returning({
         id: schema.profiles.id,
         email: schema.profiles.email,
@@ -93,22 +98,27 @@ export async function loadSession(user: {
         createdAt: schema.profiles.createdAt,
         updatedAt: schema.profiles.updatedAt,
       });
-    profile = created ? { ...created, isSuperadmin: false } : null;
+    profileRow = created ? { ...created, isSuperadmin: false } : null;
   }
 
-  const memberships = await db
-    .select({
-      id: schema.clubMembers.id,
-      clubId: schema.clubMembers.clubId,
-      role: schema.clubMembers.role,
-      joinedAt: schema.clubMembers.joinedAt,
-      clubName: schema.clubs.name,
-      clubSlug: schema.clubs.slug,
-    })
-    .from(schema.clubMembers)
-    .innerJoin(schema.clubs, eq(schema.clubs.id, schema.clubMembers.clubId))
-    .where(eq(schema.clubMembers.profileId, user.id))
-    .orderBy(desc(schema.clubMembers.joinedAt));
+  // Memberships, linked accounts y cookie de perfil activo en paralelo
+  const [memberships, linkedAccounts, activeSelection] = await Promise.all([
+    db
+      .select({
+        id: schema.clubMembers.id,
+        clubId: schema.clubMembers.clubId,
+        role: schema.clubMembers.role,
+        joinedAt: schema.clubMembers.joinedAt,
+        clubName: schema.clubs.name,
+        clubSlug: schema.clubs.slug,
+      })
+      .from(schema.clubMembers)
+      .innerJoin(schema.clubs, eq(schema.clubs.id, schema.clubMembers.clubId))
+      .where(eq(schema.clubMembers.profileId, user.id))
+      .orderBy(desc(schema.clubMembers.joinedAt)),
+    getLinkedAccounts(user.id),
+    getActiveProfile(),
+  ]);
 
   const primary = memberships[0]
     ? {
@@ -119,13 +129,11 @@ export async function loadSession(user: {
       }
     : null;
 
-  const linkedAccounts = await getLinkedAccounts(user.id);
-  const activeSelection = await getActiveProfile();
   const activeAccount = resolveActiveAccount(activeSelection, linkedAccounts);
 
   return {
     user: { id: user.id, email: user.email },
-    profile,
+    profile: profileRow,
     memberships,
     primary,
     linkedAccounts,

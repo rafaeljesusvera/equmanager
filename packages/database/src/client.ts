@@ -32,7 +32,7 @@ function getClient(): DrizzleClient {
   // El transaction-pooler (puerto 6543) admite cientos de conexiones
   // simultáneas en el pool global de Supabase.
   const queryClient = postgres(connectionString, {
-    max: 5,
+    max: 20,
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false, // Supabase pgbouncer no soporta prepared statements
