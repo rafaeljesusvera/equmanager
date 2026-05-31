@@ -32,7 +32,7 @@ function getClient(): DrizzleClient {
   // El transaction-pooler (puerto 6543) admite cientos de conexiones
   // simultáneas en el pool global de Supabase.
   const queryClient = postgres(connectionString, {
-    max: 20,
+    max: 3, // Vercel crea múltiples instancias lambdas; 3 por instancia no satura el pool de 15 del plan Free
     idle_timeout: 20,
     max_lifetime: 1800, // recicla conexiones cada 30 min (bueno para serverless)
     connect_timeout: 10,
