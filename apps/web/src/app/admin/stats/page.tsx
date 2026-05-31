@@ -1,216 +1,154 @@
-import { Suspense } from 'react';
-import { db, schema } from '@equmanager/database';
-import { isNotNull, gte, sql } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
+'use client';
+
+import { useEffect, useState } from 'react';
 import {
   BuildingsIcon,
   HorseIcon,
   GraduationCapIcon,
   UsersIcon,
   SealCheckIcon,
+  ArrowClockwiseIcon,
+  WarningCircleIcon,
 } from '@phosphor-icons/react/dist/ssr';
-import { PageHeader } from '@/components/page/PageHeader';
 import { AdminGrowthChartWrapper } from '@/components/admin/AdminGrowthChartWrapper';
 
-export const metadata = { title: 'Superadmin · Estadísticas' };
-export const dynamic = 'force-dynamic';
+type Point = { label: string; value: number };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-type MonthRow = { month: string; n: number };
-
-function buildSeries(rows: MonthRow[]): { label: string; value: number }[] {
-  const map = new Map(rows.map((r) => [r.month, r.n]));
-  const now = new Date();
-  return Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-    return { label, value: map.get(key) ?? 0 };
-  });
-}
-
-function since11Months() {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 11);
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-// ─── Una función cacheada por métrica ────────────────────────────────────────
-// Cada una va en su propio Suspense → aparecen una a una según cargan
-
-const getClubStats = unstable_cache(async () => {
-  const since = since11Months();
-  const n = sql<number>`count(*)::int`;
-  const [total, growth, federated, directory] = await Promise.all([
-    db.select({ n }).from(schema.clubs).then((r) => r[0]?.n ?? 0),
-    db
-      .select({ month: sql<string>`to_char(${schema.clubs.createdAt}, 'YYYY-MM')`, n: sql<number>`count(*)::int` })
-      .from(schema.clubs).where(gte(schema.clubs.createdAt, since))
-      .groupBy(sql`to_char(${schema.clubs.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`to_char(${schema.clubs.createdAt}, 'YYYY-MM')`)
-      .catch(() => [] as MonthRow[]),
-    db.select({ n }).from(schema.clubs).where(isNotNull(schema.clubs.directoryClubId)).then((r) => r[0]?.n ?? 0),
-    db.select({ n }).from(schema.directoryClubs).then((r) => r[0]?.n ?? 0),
-  ]);
-  return { total, series: buildSeries(growth as MonthRow[]), federated, directory };
-}, ['admin-stats-clubs'], { revalidate: 300 });
-
-const getHorseStats = unstable_cache(async () => {
-  const since = since11Months();
-  const n = sql<number>`count(*)::int`;
-  const [total, growth] = await Promise.all([
-    db.select({ n }).from(schema.horses).then((r) => r[0]?.n ?? 0),
-    db
-      .select({ month: sql<string>`to_char(${schema.horses.createdAt}, 'YYYY-MM')`, n: sql<number>`count(*)::int` })
-      .from(schema.horses).where(gte(schema.horses.createdAt, since))
-      .groupBy(sql`to_char(${schema.horses.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`to_char(${schema.horses.createdAt}, 'YYYY-MM')`)
-      .catch(() => [] as MonthRow[]),
-  ]);
-  return { total, series: buildSeries(growth as MonthRow[]) };
-}, ['admin-stats-horses'], { revalidate: 300 });
-
-const getRiderStats = unstable_cache(async () => {
-  const since = since11Months();
-  const n = sql<number>`count(*)::int`;
-  const [total, growth] = await Promise.all([
-    db.select({ n }).from(schema.riders).then((r) => r[0]?.n ?? 0),
-    db
-      .select({ month: sql<string>`to_char(${schema.riders.createdAt}, 'YYYY-MM')`, n: sql<number>`count(*)::int` })
-      .from(schema.riders).where(gte(schema.riders.createdAt, since))
-      .groupBy(sql`to_char(${schema.riders.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`to_char(${schema.riders.createdAt}, 'YYYY-MM')`)
-      .catch(() => [] as MonthRow[]),
-  ]);
-  return { total, series: buildSeries(growth as MonthRow[]) };
-}, ['admin-stats-riders'], { revalidate: 300 });
-
-const getProfileStats = unstable_cache(async () => {
-  const since = since11Months();
-  const n = sql<number>`count(*)::int`;
-  const [total, growth] = await Promise.all([
-    db.select({ n }).from(schema.profiles).then((r) => r[0]?.n ?? 0),
-    db
-      .select({ month: sql<string>`to_char(${schema.profiles.createdAt}, 'YYYY-MM')`, n: sql<number>`count(*)::int` })
-      .from(schema.profiles).where(gte(schema.profiles.createdAt, since))
-      .groupBy(sql`to_char(${schema.profiles.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`to_char(${schema.profiles.createdAt}, 'YYYY-MM')`)
-      .catch(() => [] as MonthRow[]),
-  ]);
-  return { total, series: buildSeries(growth as MonthRow[]) };
-}, ['admin-stats-profiles'], { revalidate: 300 });
-
-// ─── Async cards (cada uno en su Suspense) ───────────────────────────────────
-
-async function ClubCard() {
-  const { total, series, federated, directory } = await getClubStats();
-  return (
-    <StatCard
-      icon={<BuildingsIcon size={22} weight="duotone" />}
-      label="Clubes operativos"
-      value={total}
-      series={series}
-      color="#0891b2"
-      extra={
-        directory > 0 ? (
-          <div className="mt-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-stone-500">
-              <SealCheckIcon size={13} weight="fill" className="text-emerald-600" />
-              {federated} de {directory} federados
-            </div>
-            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
-              <div
-                className="h-full rounded-full bg-emerald-500"
-                style={{ width: `${(federated / directory) * 100}%` }}
-              />
-            </div>
-          </div>
-        ) : null
-      }
-    />
-  );
-}
-
-async function HorseCard() {
-  const { total, series } = await getHorseStats();
-  return (
-    <StatCard
-      icon={<HorseIcon size={22} weight="duotone" />}
-      label="Caballos"
-      value={total}
-      series={series}
-      color="#b45309"
-    />
-  );
-}
-
-async function RiderCard() {
-  const { total, series } = await getRiderStats();
-  return (
-    <StatCard
-      icon={<GraduationCapIcon size={22} weight="duotone" />}
-      label="Alumnos"
-      value={total}
-      series={series}
-      color="#16a34a"
-    />
-  );
-}
-
-async function ProfileCard() {
-  const { total, series } = await getProfileStats();
-  return (
-    <StatCard
-      icon={<UsersIcon size={22} weight="duotone" />}
-      label="Usuarios registrados"
-      value={total}
-      series={series}
-      color="#7c3aed"
-    />
-  );
-}
-
-function CardSkeleton() {
-  return (
-    <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-card">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 animate-pulse rounded-2xl bg-stone-100" />
-        <div className="h-3 w-24 animate-pulse rounded-full bg-stone-100" />
-      </div>
-      <div className="mt-3 h-9 w-20 animate-pulse rounded-xl bg-stone-100" />
-      <div className="mt-3 h-16 w-full animate-pulse rounded-xl bg-stone-100" />
-    </div>
-  );
-}
+type Stats = {
+  clubs: number;
+  horses: number;
+  riders: number;
+  profiles: number;
+  directory: number;
+  federated: number;
+  series: {
+    clubs: Point[];
+    horses: Point[];
+    riders: Point[];
+    profiles: Point[];
+  };
+};
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminStatsPage() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
+
+  function load(signal: AbortSignal) {
+    setStatus('loading');
+    setStats(null);
+    fetch('/api/admin/stats', { signal })
+      .then((r) => {
+        if (!r.ok) throw new Error('error');
+        return r.json() as Promise<Stats>;
+      })
+      .then((data) => {
+        setStats(data);
+        setStatus('ok');
+      })
+      .catch((e) => {
+        if (e.name === 'AbortError') return; // navegación → no hacer nada
+        setStatus('error');
+      });
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort(); // cancela si el usuario navega
+  }, []);
+
   return (
     <div className="p-6 md:p-10">
-      <PageHeader
-        eyebrow="Superadmin"
-        title="Estadísticas del sistema"
-        description="Evolución de los últimos 12 meses. Los datos se cargan de forma progresiva y se cachean 5 minutos."
-      />
-
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Suspense fallback={<CardSkeleton />}>
-          <ClubCard />
-        </Suspense>
-        <Suspense fallback={<CardSkeleton />}>
-          <ProfileCard />
-        </Suspense>
-        <Suspense fallback={<CardSkeleton />}>
-          <HorseCard />
-        </Suspense>
-        <Suspense fallback={<CardSkeleton />}>
-          <RiderCard />
-        </Suspense>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+            Superadmin
+          </p>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-stone-900">
+            Estadísticas del sistema
+          </h1>
+          <p className="mt-1 text-sm font-medium text-stone-500">
+            Evolución de los últimos 12 meses.
+          </p>
+        </div>
+        {status === 'error' && (
+          <button
+            onClick={() => {
+              const c = new AbortController();
+              load(c.signal);
+            }}
+            className="flex shrink-0 items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-bold text-stone-600 transition hover:bg-stone-100"
+          >
+            <ArrowClockwiseIcon size={14} weight="bold" />
+            Reintentar
+          </button>
+        )}
       </div>
+
+      {status === 'error' ? (
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-red-100 bg-red-50 px-6 py-12 text-center">
+          <WarningCircleIcon size={36} weight="duotone" className="text-red-400" />
+          <p className="text-sm font-bold text-red-700">
+            No se pudieron cargar las estadísticas
+          </p>
+          <p className="text-xs font-medium text-red-600">
+            La base de datos tardó demasiado. Puedes volver a intentarlo o continuar usando el resto de la app.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <StatCard
+            icon={<BuildingsIcon size={22} weight="duotone" />}
+            label="Clubes operativos"
+            value={stats?.clubs}
+            series={stats?.series.clubs}
+            color="#0891b2"
+            loading={status === 'loading'}
+            extra={
+              stats && stats.directory > 0 ? (
+                <div className="mt-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-stone-500">
+                    <SealCheckIcon size={13} weight="fill" className="text-emerald-600" />
+                    {stats.federated} de {stats.directory} federados
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${(stats.federated / stats.directory) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null
+            }
+          />
+          <StatCard
+            icon={<UsersIcon size={22} weight="duotone" />}
+            label="Usuarios registrados"
+            value={stats?.profiles}
+            series={stats?.series.profiles}
+            color="#7c3aed"
+            loading={status === 'loading'}
+          />
+          <StatCard
+            icon={<HorseIcon size={22} weight="duotone" />}
+            label="Caballos"
+            value={stats?.horses}
+            series={stats?.series.horses}
+            color="#b45309"
+            loading={status === 'loading'}
+          />
+          <StatCard
+            icon={<GraduationCapIcon size={22} weight="duotone" />}
+            label="Alumnos"
+            value={stats?.riders}
+            series={stats?.series.riders}
+            color="#16a34a"
+            loading={status === 'loading'}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -223,13 +161,15 @@ function StatCard({
   value,
   series,
   color,
+  loading,
   extra,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: number;
-  series: { label: string; value: number }[];
+  value: number | undefined;
+  series: Point[] | undefined;
   color: string;
+  loading: boolean;
   extra?: React.ReactNode;
 }) {
   return (
@@ -242,13 +182,23 @@ function StatCard({
           {label}
         </div>
       </div>
-      <div className="mt-3 text-4xl font-bold tracking-tight text-stone-900">
-        {value.toLocaleString('es-ES')}
-      </div>
-      {series.length > 0 && (
-        <AdminGrowthChartWrapper data={series} color={color} />
+
+      {loading ? (
+        <>
+          <div className="mt-3 h-9 w-20 animate-pulse rounded-xl bg-stone-100" />
+          <div className="mt-3 h-16 w-full animate-pulse rounded-xl bg-stone-100" />
+        </>
+      ) : (
+        <>
+          <div className="mt-3 text-4xl font-bold tracking-tight text-stone-900">
+            {value?.toLocaleString('es-ES') ?? '—'}
+          </div>
+          {series && series.length > 0 && (
+            <AdminGrowthChartWrapper data={series} color={color} />
+          )}
+          {extra}
+        </>
       )}
-      {extra}
     </div>
   );
 }
