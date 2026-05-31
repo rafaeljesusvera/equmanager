@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { db, schema } from '@equmanager/database';
 import { and, isNotNull, gte, sql } from 'drizzle-orm';
 import {
@@ -27,89 +28,94 @@ function buildSeries(rows: MonthRow[]): { label: string; value: number }[] {
   });
 }
 
-async function safeCount(query: Promise<{ n: number }[]>): Promise<number> {
-  try {
-    const rows = await query;
-    return rows[0]?.n ?? 0;
-  } catch {
-    return 0;
-  }
-}
+// Todas las queries pesadas cacheadas 5 minutos. La ruta sigue siendo
+// dinámica (auth en el layout) pero los datos no se recalculan en cada visita.
+const getAdminStats = unstable_cache(
+  async () => {
+    const since = new Date();
+    since.setMonth(since.getMonth() - 11);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
 
-async function safeGrowth(query: Promise<MonthRow[]>): Promise<MonthRow[]> {
-  try {
-    return await query;
-  } catch {
-    return [];
-  }
-}
+    const n = sql<number>`count(*)::int`;
 
-export default async function AdminHome() {
-  const since = new Date();
-  since.setMonth(since.getMonth() - 11);
-  since.setDate(1);
-  since.setHours(0, 0, 0, 0);
+    async function safe<T,>(p: Promise<T>, fallback: T): Promise<T> {
+      try { return await p; } catch { return fallback; }
+    }
 
-  const n = sql<number>`count(*)::int`;
-
-  const [
-    clubs, horses, riders, profiles, directory, federated,
-    clubsGrowth, horsesGrowth, ridersGrowth, profilesGrowth,
-  ] = await Promise.all([
-    safeCount(db.select({ n }).from(schema.clubs)),
-    safeCount(db.select({ n }).from(schema.horses)),
-    safeCount(db.select({ n }).from(schema.riders)),
-    safeCount(db.select({ n }).from(schema.profiles)),
-    safeCount(db.select({ n }).from(schema.directoryClubs)),
-    safeCount(
-      db.select({ n }).from(schema.clubs).where(isNotNull(schema.clubs.directoryClubId)),
-    ),
-
-    safeGrowth(
-      db
-        .select({
+    const [
+      clubs, horses, riders, profiles, directory, federated,
+      clubsGrowth, horsesGrowth, ridersGrowth, profilesGrowth,
+    ] = await Promise.all([
+      safe(db.select({ n }).from(schema.clubs).then(r => r[0]?.n ?? 0), 0),
+      safe(db.select({ n }).from(schema.horses).then(r => r[0]?.n ?? 0), 0),
+      safe(db.select({ n }).from(schema.riders).then(r => r[0]?.n ?? 0), 0),
+      safe(db.select({ n }).from(schema.profiles).then(r => r[0]?.n ?? 0), 0),
+      safe(db.select({ n }).from(schema.directoryClubs).then(r => r[0]?.n ?? 0), 0),
+      safe(
+        db.select({ n }).from(schema.clubs)
+          .where(isNotNull(schema.clubs.directoryClubId))
+          .then(r => r[0]?.n ?? 0),
+        0,
+      ),
+      safe(
+        db.select({
           month: sql<string>`to_char(${schema.clubs.createdAt}, 'YYYY-MM')`,
           n: sql<number>`count(*)::int`,
         })
         .from(schema.clubs)
-        .where(and(gte(schema.clubs.createdAt, since)))
+        .where(gte(schema.clubs.createdAt, since))
         .groupBy(sql`to_char(${schema.clubs.createdAt}, 'YYYY-MM')`)
         .orderBy(sql`to_char(${schema.clubs.createdAt}, 'YYYY-MM')`) as Promise<MonthRow[]>,
-    ),
-    safeGrowth(
-      db
-        .select({
+        [] as MonthRow[],
+      ),
+      safe(
+        db.select({
           month: sql<string>`to_char(${schema.horses.createdAt}, 'YYYY-MM')`,
           n: sql<number>`count(*)::int`,
         })
         .from(schema.horses)
-        .where(and(gte(schema.horses.createdAt, since)))
+        .where(gte(schema.horses.createdAt, since))
         .groupBy(sql`to_char(${schema.horses.createdAt}, 'YYYY-MM')`)
         .orderBy(sql`to_char(${schema.horses.createdAt}, 'YYYY-MM')`) as Promise<MonthRow[]>,
-    ),
-    safeGrowth(
-      db
-        .select({
+        [] as MonthRow[],
+      ),
+      safe(
+        db.select({
           month: sql<string>`to_char(${schema.riders.createdAt}, 'YYYY-MM')`,
           n: sql<number>`count(*)::int`,
         })
         .from(schema.riders)
-        .where(and(gte(schema.riders.createdAt, since)))
+        .where(gte(schema.riders.createdAt, since))
         .groupBy(sql`to_char(${schema.riders.createdAt}, 'YYYY-MM')`)
         .orderBy(sql`to_char(${schema.riders.createdAt}, 'YYYY-MM')`) as Promise<MonthRow[]>,
-    ),
-    safeGrowth(
-      db
-        .select({
+        [] as MonthRow[],
+      ),
+      safe(
+        db.select({
           month: sql<string>`to_char(${schema.profiles.createdAt}, 'YYYY-MM')`,
           n: sql<number>`count(*)::int`,
         })
         .from(schema.profiles)
-        .where(and(gte(schema.profiles.createdAt, since)))
+        .where(gte(schema.profiles.createdAt, since))
         .groupBy(sql`to_char(${schema.profiles.createdAt}, 'YYYY-MM')`)
         .orderBy(sql`to_char(${schema.profiles.createdAt}, 'YYYY-MM')`) as Promise<MonthRow[]>,
-    ),
-  ]);
+        [] as MonthRow[],
+      ),
+    ]);
+
+    return { clubs, horses, riders, profiles, directory, federated,
+             clubsGrowth, horsesGrowth, ridersGrowth, profilesGrowth };
+  },
+  ['admin-stats'],
+  { revalidate: 300 }, // 5 minutos
+);
+
+export default async function AdminHome() {
+  const {
+    clubs, horses, riders, profiles, directory, federated,
+    clubsGrowth, horsesGrowth, ridersGrowth, profilesGrowth,
+  } = await getAdminStats();
 
   const series = {
     clubs: buildSeries(clubsGrowth),
