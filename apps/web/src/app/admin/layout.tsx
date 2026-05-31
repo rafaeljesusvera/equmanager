@@ -6,6 +6,7 @@ import {
   UsersIcon,
   MagnifyingGlassIcon,
   ChartBarIcon,
+  ChartLineIcon,
   ArrowLeftIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { db, schema } from '@equmanager/database';
@@ -60,6 +61,9 @@ export default async function AdminLayout({
           </AdminLink>
           <AdminLink href="/admin/directory" icon={<MagnifyingGlassIcon size={18} weight="duotone" />}>
             Directorio público
+          </AdminLink>
+          <AdminLink href="/admin/stats" icon={<ChartLineIcon size={18} weight="duotone" />}>
+            Estadísticas
           </AdminLink>
         </nav>
         <div className="border-t border-stone-200 p-4">
