@@ -274,22 +274,22 @@ export default async function HorseDetailPage({
             {owners.map((o) => (
               <div
                 key={o.id}
-                className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 p-3"
+                className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
                     <CertificateIcon size={16} weight="duotone" />
                   </div>
-                  <div>
-                    <div className="text-sm font-bold text-stone-900">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-stone-900">
                       {o.name ?? o.email}
                     </div>
-                    <div className="text-[11px] font-medium text-stone-500">
+                    <div className="truncate text-[11px] font-medium text-stone-500">
                       {o.email}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-auto">
                   <Badge tone={o.role === 'owner' ? 'brand' : 'neutral'}>
                     {o.role}
                   </Badge>
