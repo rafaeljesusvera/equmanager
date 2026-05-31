@@ -10,7 +10,7 @@ import {
   CalendarBlankIcon,
   ChatCircleIcon,
   ClipboardTextIcon,
-  ListIcon,
+  UserCircleIcon,
   XIcon,
   CalendarPlusIcon,
   SignOutIcon,
@@ -114,6 +114,8 @@ export function BottomNav({
   clubName,
   roleLabel,
   email,
+  fullName,
+  avatarUrl,
   isSuperadmin = false,
 }: {
   roles: ClubRole[];
@@ -121,6 +123,8 @@ export function BottomNav({
   clubName: string;
   roleLabel: string;
   email: string;
+  fullName?: string | null;
+  avatarUrl?: string | null;
   isSuperadmin?: boolean;
 }) {
   const pathname = usePathname();
@@ -171,15 +175,20 @@ export function BottomNav({
         {/* right tabs */}
         <TabBtn item={r1} active={isActive(r1.href)} />
 
-        {/* Más */}
+        {/* Yo / Más */}
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
           className="flex flex-col items-center gap-0.5 px-3 py-2 text-stone-400"
           aria-label="Más opciones"
         >
-          <ListIcon size={22} weight="duotone" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em]">Más</span>
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+          ) : (
+            <UserCircleIcon size={22} weight="duotone" />
+          )}
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em]">Yo</span>
         </button>
       </nav>
 
@@ -193,16 +202,27 @@ export function BottomNav({
                 onClick={() => setDrawerOpen(false)}
                 className="absolute inset-0 bg-stone-900/55"
               />
-              <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-white shadow-2xl">
+              <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col bg-white shadow-2xl">
+                {/* Avatar + nombre del usuario */}
                 <div className="flex items-center justify-between border-b border-stone-200 p-4">
-                  <div className="flex items-center gap-2">
-                    <LogoMark size={28} />
-                    <div className="text-sm font-bold text-stone-900">Equmanager</div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">
+                        {(fullName ?? email).slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold text-stone-900">{fullName ?? email}</div>
+                      <div className="truncate text-[10px] font-medium text-stone-500">{email}</div>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setDrawerOpen(false)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-500 hover:bg-stone-100"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-stone-500 hover:bg-stone-100"
                     aria-label="Cerrar"
                   >
                     <XIcon size={18} weight="bold" />

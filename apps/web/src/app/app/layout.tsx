@@ -41,6 +41,8 @@ export default async function AppLayout({
         clubName={session.primary.clubName}
         roleLabel={roleLabel(session.primary.role)}
         email={session.user.email}
+        fullName={session.profile?.fullName}
+        avatarUrl={session.profile?.avatarUrl}
         isSuperadmin={session.profile?.isSuperadmin === true}
       />
     </div>
