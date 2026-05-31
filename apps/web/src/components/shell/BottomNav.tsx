@@ -12,7 +12,7 @@ import {
   ClipboardTextIcon,
   UserCircleIcon,
   XIcon,
-  CalendarPlusIcon,
+  MicrophoneStageIcon,
   SignOutIcon,
   ShieldStarIcon,
   ArrowRightIcon,
@@ -42,7 +42,7 @@ function getConfig(roles: ClubRole[]): NavConfig {
         { href: '/app/messages', label: 'Mensajes', icon: <ChatCircleIcon size={22} weight="duotone" /> },
         { href: '/app/feed', label: 'Feed', icon: <SparkleIcon size={22} weight="duotone" /> },
       ],
-      fab: { href: '/app/lessons', icon: <CalendarPlusIcon size={26} weight="bold" /> },
+      fab: { href: '/app/ai', icon: <MicrophoneStageIcon size={26} weight="bold" /> },
     };
   }
 
@@ -54,7 +54,7 @@ function getConfig(roles: ClubRole[]): NavConfig {
         { href: '/app/messages', label: 'Mensajes', icon: <ChatCircleIcon size={22} weight="duotone" /> },
         { href: '/app/feed', label: 'Feed', icon: <SparkleIcon size={22} weight="duotone" /> },
       ],
-      fab: { href: '/app/lessons', icon: <CalendarPlusIcon size={26} weight="bold" /> },
+      fab: { href: '/app/ai', icon: <MicrophoneStageIcon size={26} weight="bold" /> },
     };
   }
 
@@ -66,7 +66,7 @@ function getConfig(roles: ClubRole[]): NavConfig {
         { href: '/app/messages', label: 'Mensajes', icon: <ChatCircleIcon size={22} weight="duotone" /> },
         { href: '/app/people', label: 'Personas', icon: <UsersThreeIcon size={22} weight="duotone" /> },
       ],
-      fab: { href: '/app/me/horses', icon: <HorseIcon size={26} weight="bold" /> },
+      fab: { href: '/app/ai', icon: <MicrophoneStageIcon size={26} weight="bold" /> },
     };
   }
 
@@ -78,7 +78,7 @@ function getConfig(roles: ClubRole[]): NavConfig {
         { href: '/app/messages', label: 'Mensajes', icon: <ChatCircleIcon size={22} weight="duotone" /> },
         { href: '/app/people', label: 'Personas', icon: <UsersThreeIcon size={22} weight="duotone" /> },
       ],
-      fab: { href: '/app/groom', icon: <ClipboardTextIcon size={26} weight="bold" /> },
+      fab: { href: '/app/ai', icon: <MicrophoneStageIcon size={26} weight="bold" /> },
     };
   }
 
@@ -90,7 +90,7 @@ function getConfig(roles: ClubRole[]): NavConfig {
         { href: '/app/messages', label: 'Mensajes', icon: <ChatCircleIcon size={22} weight="duotone" /> },
         { href: '/app/feed', label: 'Feed', icon: <SparkleIcon size={22} weight="duotone" /> },
       ],
-      fab: { href: '/app/horse-owner', icon: <ClipboardTextIcon size={26} weight="bold" /> },
+      fab: { href: '/app/ai', icon: <MicrophoneStageIcon size={26} weight="bold" /> },
     };
   }
 
@@ -102,7 +102,7 @@ function getConfig(roles: ClubRole[]): NavConfig {
       { href: '/app/messages', label: 'Mensajes', icon: <ChatCircleIcon size={22} weight="duotone" /> },
       { href: '/app/feed', label: 'Feed', icon: <SparkleIcon size={22} weight="duotone" /> },
     ],
-    fab: { href: '/app/provider', icon: <CalendarPlusIcon size={26} weight="bold" /> },
+    fab: { href: '/app/ai', icon: <MicrophoneStageIcon size={26} weight="bold" /> },
   };
 }
 
