@@ -4,6 +4,8 @@ import { Topbar } from '@/components/shell/Topbar';
 import { ImpersonationBanner } from '@/components/shell/ImpersonationBanner';
 import { BottomNav } from '@/components/shell/BottomNav';
 import { buildNav } from '@/lib/nav';
+import { db, schema } from '@equmanager/database';
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import type { ClubRole } from '@equmanager/domain';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +18,27 @@ export default async function AppLayout({
   const session = await ensureSession();
   const roles = Array.from(new Set(session.memberships.map((m) => m.role))) as ClubRole[];
   const sections = buildNav(roles);
+
+  const unreadThreads = await db
+    .select({ id: schema.threadParticipants.id })
+    .from(schema.threadParticipants)
+    .innerJoin(
+      schema.messageThreads,
+      eq(schema.messageThreads.id, schema.threadParticipants.threadId),
+    )
+    .where(
+      and(
+        eq(schema.threadParticipants.profileId, session.user.id),
+        or(
+          isNull(schema.threadParticipants.lastReadAt),
+          gt(schema.messageThreads.lastMessageAt, schema.threadParticipants.lastReadAt),
+        ),
+      ),
+    )
+    .limit(1)
+    .catch(() => []);
+
+  const hasUnreadMessages = unreadThreads.length > 0;
 
   return (
     <div className="flex min-h-screen bg-stone-50">
@@ -44,6 +67,7 @@ export default async function AppLayout({
         fullName={session.profile?.fullName}
         avatarUrl={session.profile?.avatarUrl}
         isSuperadmin={session.profile?.isSuperadmin === true}
+        hasUnreadMessages={hasUnreadMessages}
       />
     </div>
   );

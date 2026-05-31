@@ -117,6 +117,7 @@ export function BottomNav({
   fullName,
   avatarUrl,
   isSuperadmin = false,
+  hasUnreadMessages = false,
 }: {
   roles: ClubRole[];
   sections: NavSection[];
@@ -126,6 +127,7 @@ export function BottomNav({
   fullName?: string | null;
   avatarUrl?: string | null;
   isSuperadmin?: boolean;
+  hasUnreadMessages?: boolean;
 }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -159,7 +161,11 @@ export function BottomNav({
       >
         {/* left tabs */}
         <TabBtn item={l1} active={isActive(l1.href)} />
-        <TabBtn item={l2} active={isActive(l2.href)} />
+        <TabBtn
+          item={l2}
+          active={isActive(l2.href)}
+          badge={l2.href === '/app/messages' && hasUnreadMessages}
+        />
 
         {/* FAB central */}
         <div className="relative -top-4 flex flex-col items-center">
@@ -173,7 +179,11 @@ export function BottomNav({
         </div>
 
         {/* right tabs */}
-        <TabBtn item={r1} active={isActive(r1.href)} />
+        <TabBtn
+          item={r1}
+          active={isActive(r1.href)}
+          badge={r1.href === '/app/messages' && hasUnreadMessages}
+        />
 
         {/* Yo / Más */}
         <button
@@ -300,7 +310,7 @@ export function BottomNav({
   );
 }
 
-function TabBtn({ item, active }: { item: TabItem; active: boolean }) {
+function TabBtn({ item, active, badge }: { item: TabItem; active: boolean; badge?: boolean }) {
   return (
     <Link
       href={item.href}
@@ -308,7 +318,12 @@ function TabBtn({ item, active }: { item: TabItem; active: boolean }) {
         active ? 'text-brand-700' : 'text-stone-400'
       }`}
     >
-      {item.icon}
+      <span className="relative">
+        {item.icon}
+        {badge && (
+          <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
+        )}
+      </span>
       <span className="text-[10px] font-bold uppercase tracking-[0.12em]">{item.label}</span>
     </Link>
   );
