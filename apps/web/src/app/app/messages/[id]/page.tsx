@@ -4,9 +4,9 @@ import { db, schema } from '@equmanager/database';
 import { and, asc, eq, ne } from 'drizzle-orm';
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession } from '@/lib/db';
-import { Avatar, Button, Textarea } from '@/components/ui';
-import { sendMessageAction } from '../actions';
+import { Avatar } from '@/components/ui';
 import { MessageTime } from '../MessageTime';
+import { SendMessageForm } from '../SendMessageForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,19 +136,7 @@ export default async function ThreadPage({
         })}
       </div>
 
-      <form
-        action={sendMessageAction}
-        className="mt-3 flex items-end gap-2 rounded-3xl border border-stone-200 bg-white p-3 shadow-card"
-      >
-        <input type="hidden" name="threadId" value={id} />
-        <Textarea
-          name="body"
-          rows={2}
-          placeholder="Escribe un mensaje…"
-          required
-        />
-        <Button type="submit">Enviar</Button>
-      </form>
+      <SendMessageForm threadId={id} />
     </div>
   );
 }
