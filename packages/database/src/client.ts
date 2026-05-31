@@ -34,8 +34,9 @@ function getClient(): DrizzleClient {
   const queryClient = postgres(connectionString, {
     max: 20,
     idle_timeout: 20,
+    max_lifetime: 1800, // recicla conexiones cada 30 min (bueno para serverless)
     connect_timeout: 10,
-    prepare: false, // Supabase pgbouncer no soporta prepared statements
+    prepare: false, // Transaction Pooler (PgBouncer) no soporta prepared statements
   });
 
   cached = drizzle(queryClient, { schema, logger: false });
