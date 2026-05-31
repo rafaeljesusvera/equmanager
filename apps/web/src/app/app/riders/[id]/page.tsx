@@ -12,7 +12,8 @@ import {
 import { RIDER_CATEGORIES, RIDER_TIERS } from '@equmanager/domain';
 import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
-import { Badge, Button, Field, Input, Select, Textarea } from '@/components/ui';
+import { Badge, Button, Field, Input, Select, Textarea, SubmitButton,
+} from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
@@ -132,9 +133,9 @@ export default async function RiderDetailPage({
         {rider.profileId ? (
           <form action={impersonateRiderAction}>
             <input type="hidden" name="id" value={rider.id} />
-            <Button type="submit" variant="outline">
+            <SubmitButton variant="outline">
               <EyeIcon size={14} weight="bold" /> Ver Equmanager como {rider.name}
-            </Button>
+            </SubmitButton>
           </form>
         ) : (
           <p className="text-sm font-medium text-stone-500">

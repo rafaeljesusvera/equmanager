@@ -10,7 +10,8 @@ import {
 import { ensureSession, assertRole } from '@/lib/db';
 import { ensureRiderForProfile } from '@/lib/db/rider';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, Button, EmptyState } from '@/components/ui';
+import { Badge, Button, EmptyState, SubmitButton,
+} from '@/components/ui';
 import { formatCents, formatDate } from '@/lib/format';
 import { enrollInCourseAction } from './actions';
 
@@ -199,9 +200,9 @@ function CourseCard({
             {riderId && (
               <input type="hidden" name="riderId" value={riderId} />
             )}
-            <Button type="submit" size="sm" className="w-full">
+            <SubmitButton size="sm" className="w-full">
               Apuntarme al curso
-            </Button>
+            </SubmitButton>
           </form>
         )}
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PlusIcon, XIcon, MegaphoneIcon } from '@phosphor-icons/react/dist/ssr';
-import { Avatar, Button, Input, Textarea } from '@/components/ui';
+import { Avatar, Button, Input, Textarea, SubmitButton } from '@/components/ui';
 import { roleLabel } from '@/lib/role-label';
 import type { ClubRole } from '@equmanager/domain';
 import { createBroadcastAction, startDirectThreadAction } from './actions';
@@ -202,9 +202,9 @@ export function NewThreadDialog({
                   required
                 />
                 <div className="mt-3 flex justify-end">
-                  <Button type="submit" disabled={!body.trim()}>
+                  <SubmitButton disabled={!body.trim()}>
                     Enviar
-                  </Button>
+                  </SubmitButton>
                 </div>
               </form>
             )}
@@ -277,9 +277,9 @@ export function NewThreadDialog({
                 />
 
                 <div className="mt-3 flex justify-end">
-                  <Button type="submit" disabled={!body.trim()}>
+                  <SubmitButton disabled={!body.trim()}>
                     Enviar anuncio
-                  </Button>
+                  </SubmitButton>
                 </div>
               </form>
             )}

@@ -8,7 +8,8 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, Button, EmptyState } from '@/components/ui';
+import { Badge, Button, EmptyState, SubmitButton,
+} from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import { markAllReadAction, markOneReadAction } from './actions';
 
@@ -33,9 +34,9 @@ export default async function NotificationsPage() {
         description="Avisos de inscripciones, checklists, IA y pagos."
         action={
           <form action={markAllReadAction}>
-            <Button type="submit" variant="outline" size="sm">
+            <SubmitButton variant="outline" size="sm">
               <CheckCircleIcon size={12} weight="bold" /> Marcar todas leídas
-            </Button>
+            </SubmitButton>
           </form>
         }
       />

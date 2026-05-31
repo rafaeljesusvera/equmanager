@@ -12,6 +12,7 @@ import {
   Button,
   Field,
   Input,
+  SubmitButton,
 } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
@@ -163,9 +164,9 @@ export default async function ProfilePage({
             </Field>
           </div>
           <div className="md:col-span-2 flex items-end">
-            <Button type="submit" className="w-full">
+            <SubmitButton className="w-full">
               Cambiar email
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </DetailSection>
@@ -204,9 +205,9 @@ export default async function ProfilePage({
             </Field>
           </div>
           <div className="md:col-span-2">
-            <Button type="submit" className="w-full">
+            <SubmitButton className="w-full">
               Actualizar contraseña
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </DetailSection>

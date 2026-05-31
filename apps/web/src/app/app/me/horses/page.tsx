@@ -11,7 +11,8 @@ import { HORSE_KINDS } from '@equmanager/domain';
 import { ensureSession, assertRole } from '@/lib/db';
 import { ensureRiderForProfile } from '@/lib/db/rider';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, Button, CreatePanel, EmptyState, Field, Input, Select } from '@/components/ui';
+import { Badge, Button, CreatePanel, EmptyState, Field, Input, Select, SubmitButton,
+} from '@/components/ui';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { registerOwnedHorseAction } from './actions';
 
@@ -154,9 +155,9 @@ export default async function MeHorsesPage() {
             <Input name="color" />
           </Field>
           <div className="md:col-span-4">
-            <Button type="submit" className="w-full">
+            <SubmitButton className="w-full">
               Registrar como propietario
-            </Button>
+            </SubmitButton>
           </div>
         </form>
         <p className="mt-2 text-[11px] font-medium text-stone-500">

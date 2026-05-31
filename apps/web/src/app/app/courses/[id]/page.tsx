@@ -10,7 +10,8 @@ import {
 import { COURSE_STATUSES, DISCIPLINES } from '@equmanager/domain';
 import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
-import { Button, Field, Input, Select, Textarea } from '@/components/ui';
+import { Button, Field, Input, Select, Textarea, SubmitButton,
+} from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
@@ -279,9 +280,9 @@ export default async function CourseDetailPage({
             </Field>
           </div>
           <div className="md:col-span-1 flex items-end">
-            <Button type="submit" variant="outline" className="w-full">
+            <SubmitButton variant="outline" className="w-full">
               <PlusIcon size={14} weight="bold" /> Añadir
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </DetailSection>

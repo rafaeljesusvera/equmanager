@@ -20,6 +20,7 @@ import {
   Select,
   Textarea,
   Badge,
+  SubmitButton,
 } from '@/components/ui';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
@@ -332,9 +333,9 @@ export default async function HorseDetailPage({
             </Field>
           </div>
           <div className="md:col-span-1 flex items-end">
-            <Button type="submit" variant="outline" className="w-full">
+            <SubmitButton variant="outline" className="w-full">
               <UserPlusIcon size={14} weight="bold" /> Añadir
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </DetailSection>

@@ -11,7 +11,8 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, assertRole } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, Button, Textarea } from '@/components/ui';
+import { Badge, Button, Textarea, SubmitButton,
+} from '@/components/ui';
 import {
   confirmVoiceNoteAction,
   discardVoiceNoteAction,
@@ -162,9 +163,9 @@ export default async function AiReviewPage({
           )}
 
           <div className="mt-6 flex gap-2">
-            <Button type="submit" size="lg">
+            <SubmitButton size="lg">
               <CheckCircleIcon size={16} weight="bold" /> Confirmar y enviar
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       )}
@@ -184,9 +185,9 @@ export default async function AiReviewPage({
 
       <form action={discardVoiceNoteAction} className="mt-6 inline-block">
         <input type="hidden" name="noteId" value={note.id} />
-        <Button type="submit" variant="ghost" size="sm">
+        <SubmitButton variant="ghost" size="sm">
           <TrashIcon size={14} weight="bold" /> Descartar nota
-        </Button>
+        </SubmitButton>
       </form>
     </div>
   );

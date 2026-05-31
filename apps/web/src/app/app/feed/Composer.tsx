@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Textarea } from '@/components/ui';
+import { Button, Textarea, SubmitButton } from '@/components/ui';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
 import { createPostAction } from './actions';
 
@@ -26,9 +26,9 @@ export function Composer() {
         <div className="max-w-[140px]">
           <PhotoUpload name="photoUrl" folder="posts" label="Foto" />
         </div>
-        <Button type="submit" disabled={!body.trim()}>
+        <SubmitButton disabled={!body.trim()}>
           Publicar
-        </Button>
+        </SubmitButton>
       </div>
     </form>
   );

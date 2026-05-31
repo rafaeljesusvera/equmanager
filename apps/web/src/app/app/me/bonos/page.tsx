@@ -9,7 +9,8 @@ import {
 import { ensureSession, assertRole } from '@/lib/db';
 import { ensureRiderForProfile } from '@/lib/db/rider';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, Button, EmptyState } from '@/components/ui';
+import { Badge, Button, EmptyState, SubmitButton,
+} from '@/components/ui';
 import { formatCents, formatDate } from '@/lib/format';
 import { buyBonoAction } from './actions';
 
@@ -146,9 +147,9 @@ export default async function MeBonosPage() {
                 )}
                 <form action={buyBonoAction} className="mt-auto pt-4">
                   <input type="hidden" name="bonoId" value={b.id} />
-                  <Button type="submit" className="w-full">
+                  <SubmitButton className="w-full">
                     Comprar (pago simulado)
-                  </Button>
+                  </SubmitButton>
                 </form>
               </article>
             ))}

@@ -11,7 +11,8 @@ import {
 import { ensureSession, assertRole } from '@/lib/db';
 import { ensureRiderForProfile } from '@/lib/db/rider';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
-import { Badge, Button, Field, Input, Select } from '@/components/ui';
+import { Badge, Button, Field, Input, Select, SubmitButton,
+} from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import { postReviewAction } from '../actions';
 
@@ -193,9 +194,9 @@ export default async function MeHorseDetailPage({
             </Field>
           </div>
           <div className="sm:col-span-6">
-            <Button type="submit" variant="secondary">
+            <SubmitButton variant="secondary">
               <StarIcon size={12} weight="fill" /> Guardar opinión
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </DetailSection>

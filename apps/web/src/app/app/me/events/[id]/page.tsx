@@ -12,7 +12,8 @@ import {
 import { ensureSession, assertRole } from '@/lib/db';
 import { ensureRiderForProfile } from '@/lib/db/rider';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, SubmitButton,
+} from '@/components/ui';
 import { formatCents, formatDateTime } from '@/lib/format';
 import { enrollInEventAction } from '../actions';
 
@@ -182,11 +183,11 @@ export default async function MeEventDetailPage({
           <form action={enrollInEventAction}>
             <input type="hidden" name="eventId" value={event.id} />
             <input type="hidden" name="priceCents" value={event.priceCents} />
-            <Button type="submit" size="lg" className="w-full sm:w-auto">
+            <SubmitButton size="lg" className="w-full sm:w-auto">
               {event.priceCents > 0
                 ? `Apuntarme · ${formatCents(event.priceCents)}`
                 : 'Apuntarme gratis'}
-            </Button>
+            </SubmitButton>
           </form>
         )}
       </DetailSection>

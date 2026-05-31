@@ -16,6 +16,7 @@ import {
   Field,
   Select,
   Textarea,
+  SubmitButton,
 } from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import { createVoiceNoteAction } from './actions';
@@ -117,9 +118,9 @@ export default async function AiPage({
               placeholder={`Ej.: "Hoy en la de las 11, Lucía con Sultán muy buen ritmo en el galope, dadle insignia de progreso. Marcos con Trueno cuidar la mano izquierda. Inés excelente posición de pierna, lista para subir nivel."`}
             />
           </Field>
-          <Button type="submit" size="lg">
+          <SubmitButton size="lg">
             <MicrophoneStageIcon size={16} weight="bold" /> Analizar con IA
-          </Button>
+          </SubmitButton>
         </form>
       </section>
 

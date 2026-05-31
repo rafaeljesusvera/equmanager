@@ -8,7 +8,8 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, assertRole } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Button, Textarea } from '@/components/ui';
+import { Button, Textarea, SubmitButton,
+} from '@/components/ui';
 import { formatDate } from '@/lib/format';
 import { submitCareLogAction } from '../actions';
 
@@ -153,9 +154,9 @@ export default async function GroomChecklistPage({
             />
           </div>
 
-          <Button type="submit" size="lg" className="mt-4 w-full">
+          <SubmitButton size="lg" className="mt-4 w-full">
             <CheckCircleIcon size={16} weight="bold" /> Guardar checklist
-          </Button>
+          </SubmitButton>
         </form>
       )}
 

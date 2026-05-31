@@ -15,6 +15,7 @@ import {
   Field,
   Input,
   Textarea,
+  SubmitButton,
 } from '@/components/ui';
 import { CreatePanel } from '@/components/ui/CreatePanel';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
@@ -77,7 +78,7 @@ export default async function BonosPage() {
             </Field>
           </div>
           <div className="md:col-span-4">
-            <Button type="submit">Crear y abrir ficha</Button>
+            <SubmitButton>Crear y abrir ficha</SubmitButton>
           </div>
         </form>
       </CreatePanel>

@@ -16,6 +16,7 @@ import {
   Input,
   Select,
   Textarea,
+  SubmitButton,
 } from '@/components/ui';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import {
@@ -91,7 +92,7 @@ export default async function CareTemplatesPage({
             </Field>
           </div>
           <div className="md:col-span-6">
-            <Button type="submit">Crear plantilla</Button>
+            <SubmitButton>Crear plantilla</SubmitButton>
           </div>
         </form>
       </CreatePanel>
@@ -195,9 +196,9 @@ export default async function CareTemplatesPage({
                     </Field>
                   </div>
                   <div className="flex items-end">
-                    <Button type="submit" className="w-full">
+                    <SubmitButton className="w-full">
                       Añadir
-                    </Button>
+                    </SubmitButton>
                   </div>
                 </form>
               </article>

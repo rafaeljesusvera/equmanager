@@ -4,7 +4,8 @@ import { eq, sql } from 'drizzle-orm';
 import { MedalIcon } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, assertRole } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Button, EmptyState } from '@/components/ui';
+import { Button, EmptyState, SubmitButton,
+} from '@/components/ui';
 import { CreatePanel } from '@/components/ui/CreatePanel';
 import { BadgeCard } from '@/components/badge/BadgeCard';
 import { BadgeLiveEditor } from '@/components/badge/BadgeLiveEditor';
@@ -46,7 +47,7 @@ export default async function BadgesPage() {
         <form action={createBadgeAction} className="space-y-4">
           <BadgeLiveEditor clubName={session.primary.clubName} />
           <div className="flex justify-end">
-            <Button type="submit">Crear insignia</Button>
+            <SubmitButton>Crear insignia</SubmitButton>
           </div>
         </form>
       </CreatePanel>

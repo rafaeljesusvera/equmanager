@@ -16,6 +16,7 @@ import {
   Field,
   Input,
   Textarea,
+  SubmitButton,
 } from '@/components/ui';
 import { CreatePanel } from '@/components/ui/CreatePanel';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
@@ -74,7 +75,7 @@ export default async function NewsPage() {
             </label>
           </div>
           <div className="md:col-span-4">
-            <Button type="submit">Publicar</Button>
+            <SubmitButton>Publicar</SubmitButton>
           </div>
         </form>
       </CreatePanel>

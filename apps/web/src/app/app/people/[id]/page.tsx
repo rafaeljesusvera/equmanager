@@ -11,7 +11,8 @@ import {
   UsersThreeIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession } from '@/lib/db';
-import { Avatar, Button, EmptyState } from '@/components/ui';
+import { Avatar, Button, EmptyState, SubmitButton,
+} from '@/components/ui';
 import { roleLabel } from '@/lib/role-label';
 import {
   acceptConnectionAction,
@@ -215,17 +216,17 @@ export default async function PersonProfilePage({
           {isPendingToMe && conn && (
             <form action={acceptConnectionAction}>
               <input type="hidden" name="connectionId" value={conn.id} />
-              <Button type="submit" size="sm">
+              <SubmitButton size="sm">
                 Aceptar solicitud
-              </Button>
+              </SubmitButton>
             </form>
           )}
           {!conn && (
             <form action={connectAction}>
               <input type="hidden" name="recipientId" value={target.id} />
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButton size="sm" variant="outline">
                 <UserPlusIcon size={12} weight="bold" /> Conectar
-              </Button>
+              </SubmitButton>
             </form>
           )}
           <Link

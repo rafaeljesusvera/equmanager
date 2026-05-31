@@ -6,7 +6,8 @@ import { HorseIcon, ArrowRightIcon } from '@phosphor-icons/react/dist/ssr';
 import { HORSE_KINDS, HORSE_STATUSES } from '@equmanager/domain';
 import { ensureSession, assertRole } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Badge, Button, Field, Input, Select, EmptyState } from '@/components/ui';
+import { Badge, Button, Field, Input, Select, EmptyState, SubmitButton,
+} from '@/components/ui';
 import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
 import { CreatePanel } from '@/components/ui/CreatePanel';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
@@ -77,9 +78,9 @@ export default async function HorsesPage() {
             <Input name="color" placeholder="Castaño" />
           </Field>
           <div className="md:col-span-4">
-            <Button type="submit" className="w-full md:w-auto">
+            <SubmitButton className="w-full md:w-auto">
               Crear y abrir ficha
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </CreatePanel>

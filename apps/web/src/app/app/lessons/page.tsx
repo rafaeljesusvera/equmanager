@@ -9,7 +9,8 @@ import {
 import { DISCIPLINES, LESSON_STATUSES } from '@equmanager/domain';
 import { ensureSession, assertRole } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Button, EmptyState, Field, Input, Select } from '@/components/ui';
+import { Button, EmptyState, Field, Input, Select, SubmitButton,
+} from '@/components/ui';
 import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
 import { formatDateTime } from '@/lib/format';
 import {
@@ -116,9 +117,9 @@ export default async function LessonsPage() {
             </Field>
           </div>
           <div className="md:col-span-5">
-            <Button type="submit">
+            <SubmitButton>
               <PlusIcon size={14} weight="bold" /> Programar clase
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </section>
@@ -238,9 +239,9 @@ export default async function LessonsPage() {
                           ))}
                         </Select>
                       </div>
-                      <Button type="submit" variant="outline">
+                      <SubmitButton variant="outline">
                         <UserPlusIcon size={14} weight="bold" /> Añadir
-                      </Button>
+                      </SubmitButton>
                     </form>
                   )}
                 </div>

@@ -9,7 +9,8 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, assertRole, roleLabel } from '@/lib/db';
 import { PageHeader } from '@/components/page/PageHeader';
-import { Avatar, Badge, Button, CreatePanel, EmptyState, Field, Input, Select } from '@/components/ui';
+import { Avatar, Badge, Button, CreatePanel, EmptyState, Field, Input, Select, SubmitButton,
+} from '@/components/ui';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
 import { addStaffAction, removeStaffAction, updateStaffRoleAction } from './actions';
 
@@ -100,9 +101,9 @@ export default async function StaffPage({
             </Select>
           </Field>
           <div className="flex items-end">
-            <Button type="submit" className="w-full">
+            <SubmitButton className="w-full">
               Añadir
-            </Button>
+            </SubmitButton>
           </div>
         </form>
         <p className="mt-3 text-[11px] font-medium text-stone-500">
@@ -169,9 +170,9 @@ export default async function StaffPage({
                                 </option>
                               ))}
                             </Select>
-                            <Button type="submit" variant="outline" size="sm">
+                            <SubmitButton variant="outline" size="sm">
                               Cambiar
-                            </Button>
+                            </SubmitButton>
                           </form>
                         )}
                         {!isOwner && !isSelf && (

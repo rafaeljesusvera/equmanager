@@ -9,7 +9,8 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { ensureSession, assertRole } from '@/lib/db';
 import { DetailShell, DetailSection } from '@/components/detail/DetailShell';
-import { Button, Field, Select } from '@/components/ui';
+import { Button, Field, Select, SubmitButton,
+} from '@/components/ui';
 import { Input } from '@/components/ui/Input';
 import { AutoSaveForm } from '@/components/ui/AutoSaveForm';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDelete';
@@ -150,9 +151,9 @@ export default async function BadgeDetailPage({
               </Field>
             </div>
             <div className="md:col-span-1 flex items-end">
-              <Button type="submit" variant="outline" className="w-full">
+              <SubmitButton variant="outline" className="w-full">
                 <MedalIcon size={14} weight="bold" /> Entregar
-              </Button>
+              </SubmitButton>
             </div>
           </form>
         )}
