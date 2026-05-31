@@ -43,14 +43,7 @@ export async function Topbar({
   });
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-stone-200 bg-white/85 px-4 py-3 backdrop-blur md:justify-end md:px-6">
-      <MobileHeader
-        sections={sections}
-        clubName={clubName}
-        roleLabel={roleLabel}
-        email={email}
-        isSuperadmin={session.profile?.isSuperadmin === true}
-      />
+    <header className="sticky top-0 z-20 flex items-center justify-end gap-3 border-b border-stone-200 bg-white/85 px-4 py-3 backdrop-blur md:px-6">
 
       <div className="flex items-center gap-2">
         <AccountSwitcher active={active} accounts={accounts} />
